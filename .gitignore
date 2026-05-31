@@ -1,0 +1,11 @@
+.env
+*.csv
+
+# Python (powstaje przy uruchomieniu Django w kontenerze z volume ./backend:/app)
+__pycache__/
+*.py[cod]
+*venv/
+
+# Django
+staticfiles/
+*.log
