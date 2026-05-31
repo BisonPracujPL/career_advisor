@@ -16,7 +16,7 @@ tabelach**:
 
 ```mermaid
 erDiagram
-    JobOffer ||--|| ExtractedSkills : "ma zbiór skilli (1:1)"
+    JobOffer ||--|| ExtractedSkills : "1 do 1 po offer_id"
 
     JobOffer {
         bigint id PK
@@ -25,17 +25,23 @@ erDiagram
         datetime start_date
     }
     Skill {
-        string id PK "LightCast id / kod podkategorii"
+        string id PK
         string name
         string main_category
         string subcategory
-        bool   is_category
+        bool is_category
+        int vector_index UK
     }
     ExtractedSkills {
-        bigint offer_id PK_FK
-        json   skills "[{skill_id, probability}, ...]"
+        bigint offer_id PK
+        json skills
+        sparsevec skill_vector
     }
 ```
+
+Opisy kolumn znajdziesz w tabelach niżej. W skrócie: `Skill.vector_index` (`UK`,
+unikalny) to pozycja skilla w wektorze, a `ExtractedSkills.skill_vector`
+(`sparsevec`) ma `1.0` na pozycji `vector_index` każdego wymaganego skilla.
 
 Słownie:
 
@@ -75,6 +81,7 @@ nazwy kategorii).
 | `subcategory_code` | `CharField(16)`, indeks | kod podkategorii (np. `17.0.442.0`) |
 | `subcategory` | `CharField(128)` | nazwa podkategorii (np. `Microsoft Development Tools`) |
 | `is_category` | `BooleanField`, indeks | `False` = prawdziwy skill LightCast; `True` = sztuczny wiersz (podkategoria użyta jako skill) |
+| `vector_index` | `IntegerField`, **unique** | pozycja skilla w wektorze skilli oferty (`extracted_skills.skill_vector`). Stabilne, ciągłe `0..N-1` po całym słowniku (prawdziwe + syntetyczne), kolejność `(is_category, id)`. Pozwala zrobić **indeks → skill**: `Skill.objects.get(vector_index=i)`. Nadawany przez `load_skills`. |
 
 **Sztuczne wiersze (`is_category=True`):** dopasowania typu `most_common_level_1`
 w ofertach wskazują nie na skill, lecz na **podkategorię**. Aby się podlinkowały,
@@ -143,6 +150,25 @@ Jeden wiersz = jedna oferta i cały jej zbiór wyciągniętych skilli w JSON.
 |---------|-----|------|
 | `offer_id` | `OneToOneField → JobOffer` **PK**, `ON DELETE CASCADE` | ID oferty (jednocześnie klucz główny) |
 | `skills` | `JSONField` (JSONB) | zbiór skilli: `[{"skill_id": "...", "probability": 0.62}, ...]` |
+| `skill_vector` | `SparseVectorField` (pgvector `sparsevec`) | rzadki wektor nad całym słownikiem skilli; współrzędna `i` jest niezerowa, gdy oferta wymaga skilla o `vector_index = i` |
+
+### Wektor skilli (`skill_vector`)
+
+Dla każdej oferty tworzymy wektor o długości = liczbie **wszystkich** skilli w
+słowniku (prawdziwych + syntetycznych, ~32 tys.). Współrzędna `i` jest niezerowa,
+gdy oferta wymaga skilla, którego `Skill.vector_index = i` (czyli skill jest w
+`skills`, a ten zbiór jest już odfiltrowany progiem importu — domyślnie `0.5`).
+Wartość to `1.0` (tryb `binary`, domyślny) albo `match_score` (tryb
+`probability`, flaga `--vector-value`).
+
+> **Dlaczego `sparsevec`, a nie `vector`?** Słownik ma ~32 tys. skilli, czyli
+> więcej niż limit 16 tys. wymiarów gęstego `vector`/`halfvec` w pgvector.
+> `sparsevec` obsługuje do 1 mld wymiarów i zapisuje tylko niezerowe pozycje, a
+> jedna oferta ma ich tylko kilka — więc to zarazem konieczne i znacznie tańsze.
+
+Mapowanie **indeks → skill** jest relacyjne przez `skills_dict.vector_index`,
+więc mając np. współrzędną `5` zapytasz `Skill.objects.get(vector_index=5)` i
+poznasz nazwę skilla.
 
 Format `skills`:
 
@@ -189,13 +215,30 @@ tylko do skilli, które już istnieją w słowniku):
 # 1) słownik skilli LightCast + sztuczne wiersze podkategorii
 python manage.py load_skills /data/lightcast_data_formatted.csv /data/lightcast_hier_mapper.json
 
-# 2) oferty + zbiór skilli w JSON (zapisuje tylko match_score >= threshold)
+# 2) oferty + zbiór skilli w JSON + wektor skilli (zapisuje tylko match_score >= threshold)
 python manage.py load_offers /data/data_en_processed.csv --threshold 0.5
 ```
 
 Próg (`--threshold`) decyduje, z jakim minimalnym prawdopodobieństwem skill jest
 „brany". Domyślnie `0.5` (stała `DEFAULT_SKILL_THRESHOLD` w `models.py`).
 `--batch` (domyślnie 1000) kontroluje liczbę ofert na jedną transakcję importu.
+`--vector-value` ustala wartość w wektorze: `binary` (1.0, domyślnie) lub
+`probability` (zapisuje `match_score`).
+
+> **Wymagane:** obraz Postgresa z pgvectorem (`pgvector/pgvector:pg16`, ustawiony
+> w `docker-compose.yml`) oraz pakiet `pgvector` (w `requirements.txt`). Migracja
+> `0002_skill_vector` włącza rozszerzenie (`CREATE EXTENSION vector`) i dodaje
+> kolumny `vector_index` oraz `skill_vector`.
+
+### Przebudowa wektorów dla już wczytanych ofert
+
+Gdy oferty są już w bazie i nie chcesz ich wczytywać od nowa (np. po dodaniu
+kolumny albo po ponownym zaindeksowaniu słownika), przelicz same wektory:
+
+```bash
+python manage.py build_skill_vectors                       # binary (1.0)
+python manage.py build_skill_vectors --vector-value probability
+```
 
 ---
 
@@ -217,9 +260,29 @@ ExtractedSkills.objects.filter(skills__contains=[{"skill_id": "KS1235V5W7TM41LP3
 
 # same prawdziwe skille w słowniku (bez sztucznych kategorii)
 Skill.objects.filter(is_category=False)
+
+# --- wektor skilli oferty ---
+
+# rzadki wektor oferty (pgvector SparseVector)
+vec = offer.extracted.skill_vector
+vec.indices()        # niezerowe pozycje, np. [0, 5, 128, ...]
+vec.values()         # wartości w tych pozycjach, np. [1.0, 1.0, ...]
+vec.dimensions()     # długość = liczba wszystkich skilli w słowniku
+
+# indeks → skill (np. współrzędna nr 5)
+Skill.objects.get(vector_index=5).name
+
+# nazwy skilli, które oferta wymaga (z niezerowych pozycji wektora)
+Skill.objects.filter(vector_index__in=vec.indices()).values("vector_index", "name")
+
+# oferty najbardziej podobne skillowo (odległość kosinusowa na sparsevec)
+from pgvector.django import CosineDistance
+ExtractedSkills.objects.annotate(
+    d=CosineDistance("skill_vector", offer.extracted.skill_vector)
+).exclude(offer_id=offer.id).order_by("d")[:10]
 ```
 
-##Jak wykonać feed danymi?
+## Jak wykonać feed danymi?
 Potrzebna pliku data_en_processed.dsv (info o ofertach z wyeksportowanymi skillami)
 oraz lightcast_data_formatted.csv z biblioteki ojd daps skills do mapowania skili i ich kategoryzacji
 ```

@@ -29,6 +29,7 @@ Both match types map onto a dictionary id:
 
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
+from pgvector.django import SparseVectorField
 
 # Probability threshold above which a skill match is considered reliable enough
 # to "take". In the sample data scores range 0.1..1.0 (median ~0.75, p25 ~0.39),
@@ -56,6 +57,13 @@ class Skill(models.Model):
     # Synthetic rows added for "most_common_level_1" matches: a subcategory used
     # as a skill (id = subcategory code). False for real LightCast skills.
     is_category = models.BooleanField(default=False, db_index=True)
+
+    # Position of this skill inside the per-offer skill vector
+    # (``ExtractedSkills.skill_vector``). Stable, contiguous 0..N-1 over the whole
+    # dictionary (real + synthetic). Lets you go index -> skill: given dimension
+    # ``i`` of a vector, ``Skill.objects.get(vector_index=i)`` is its skill.
+    # Assigned by ``load_skills`` after the dictionary is fully loaded.
+    vector_index = models.IntegerField(null=True, blank=True, unique=True)
 
     class Meta:
         db_table = "skills_dict"
@@ -156,6 +164,16 @@ class ExtractedSkills(models.Model):
         related_name="extracted",
     )
     skills = models.JSONField(default=list)
+
+    # One-hot-ish sparse vector over the whole skill dictionary. Dimension equals
+    # the number of skills (real + synthetic); a coordinate is non-zero iff the
+    # offer requires that skill (i.e. the skill is present in ``skills``, which is
+    # already filtered at the import threshold). ``sparsevec`` is used instead of a
+    # dense ``vector`` because the dictionary has ~32k skills (over the dense 16k
+    # dim limit) while each offer only touches a handful. Coordinate i maps back to
+    # ``Skill`` via ``Skill.objects.get(vector_index=i)``. Built by ``load_offers``
+    # (or ``build_skill_vectors``); see ``apps.job_market.vectors``.
+    skill_vector = SparseVectorField(null=True, blank=True)
 
     class Meta:
         db_table = "extracted_skills"

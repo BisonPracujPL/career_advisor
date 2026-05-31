@@ -25,6 +25,11 @@ from apps.job_market.models import (
     JobOffer,
     Skill,
 )
+from apps.job_market.vectors import (
+    VECTOR_VALUE_CHOICES,
+    build_skill_vector,
+    skill_index_map,
+)
 
 # Both match types resolve onto a Skill dictionary id:
 #  - "skill"               -> match_id is a LightCast skill id
@@ -118,10 +123,18 @@ class Command(BaseCommand):
         parser.add_argument("--threshold", type=float, default=DEFAULT_SKILL_THRESHOLD)
         parser.add_argument("--limit", type=int, default=None, help="Stop after N rows.")
         parser.add_argument("--batch", type=int, default=1000, help="Offers per DB batch.")
+        parser.add_argument(
+            "--vector-value",
+            choices=VECTOR_VALUE_CHOICES,
+            default="binary",
+            help="Value stored per present skill in skill_vector: "
+            "'binary' (1.0) or 'probability' (match score).",
+        )
 
     def handle(self, *args, **opts):
         path, threshold, limit = opts["csv_path"], opts["threshold"], opts["limit"]
         batch_size = opts["batch"]
+        self.vector_value = opts["vector_value"]
         # The Skill dictionary (LightCast) must be loaded first; we only keep
         # skills that exist there.
         known_skill_ids = set(Skill.objects.values_list("id", flat=True))
@@ -130,6 +143,16 @@ class Command(BaseCommand):
                 self.style.WARNING(
                     "Skill dictionary is empty. Run `load_skills` first, "
                     "otherwise no skills will be stored."
+                )
+            )
+        # skill_id -> vector position; the vector's dimension is the dictionary size.
+        self.index_map = skill_index_map()
+        self.vector_dim = len(self.index_map)
+        if known_skill_ids and not self.vector_dim:
+            self.stderr.write(
+                self.style.WARNING(
+                    "Skills have no vector_index yet. Re-run `load_skills` so "
+                    "skill vectors can be built; storing offers without vectors."
                 )
             )
         self.n_offers = self.n_skills = self.n_skipped = 0
@@ -162,7 +185,13 @@ class Command(BaseCommand):
             return
         offers = JobOffer.objects.bulk_create([offer for offer, _ in batch])
         extracted = [
-            ExtractedSkills(offer=offer, skills=skills)
+            ExtractedSkills(
+                offer=offer,
+                skills=skills,
+                skill_vector=build_skill_vector(
+                    skills, self.index_map, self.vector_dim, self.vector_value
+                ),
+            )
             for offer, (_, skills) in zip(offers, batch)
         ]
         ExtractedSkills.objects.bulk_create(extracted)

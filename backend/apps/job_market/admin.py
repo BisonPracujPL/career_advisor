@@ -19,16 +19,21 @@ class JobOfferAdmin(admin.ModelAdmin):
 
 @admin.register(Skill)
 class SkillAdmin(admin.ModelAdmin):
-    list_display = ["id", "name", "main_category", "subcategory", "is_category"]
+    list_display = ["vector_index", "id", "name", "main_category", "subcategory", "is_category"]
     list_filter = ["is_category", "main_category"]
     search_fields = ["id", "name"]
+    ordering = ["vector_index"]
 
 
 @admin.register(ExtractedSkills)
 class ExtractedSkillsAdmin(admin.ModelAdmin):
-    list_display = ["offer", "skill_count"]
+    list_display = ["offer", "skill_count", "has_vector"]
     search_fields = ["offer__job_title"]
 
     @admin.display(description="skills")
     def skill_count(self, obj):
         return len(obj.skills or [])
+
+    @admin.display(description="vector", boolean=True)
+    def has_vector(self, obj):
+        return obj.skill_vector is not None

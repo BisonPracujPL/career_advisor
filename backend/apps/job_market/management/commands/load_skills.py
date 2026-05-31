@@ -65,6 +65,40 @@ class Command(BaseCommand):
             )
         )
 
+        n_indexed = self._assign_vector_indices()
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Assigned vector_index 0..{n_indexed - 1} to {n_indexed} skills "
+                f"(skill-vector dimension = {n_indexed})."
+            )
+        )
+
+    @staticmethod
+    def _assign_vector_indices():
+        """Give every skill a stable position in the offer skill vector.
+
+        Indices are contiguous ``0..N-1`` over the whole dictionary, ordered by
+        ``(is_category, id)`` so real LightCast skills come first and synthetic
+        subcategory rows after. The ordering is deterministic, so re-running keeps
+        the same mapping (existing offer vectors stay valid).
+        """
+        # Single UPDATE with a window function: no intermediate state, no unique-
+        # constraint violations even when re-running on an already-indexed table.
+        from django.db import connection
+
+        with connection.cursor() as cur:
+            cur.execute("""
+                UPDATE skills_dict AS s
+                SET    vector_index = ranked.idx
+                FROM   (
+                    SELECT id,
+                           ROW_NUMBER() OVER (ORDER BY is_category, id) - 1 AS idx
+                    FROM   skills_dict
+                ) AS ranked
+                WHERE  s.id = ranked.id
+            """)
+            return cur.rowcount
+
     @staticmethod
     def _synthetic_subcategory_skills(mapper):
         """One Skill per subcategory (3-part code, e.g. '19.0.511.0').
