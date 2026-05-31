@@ -18,7 +18,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     # local apps
-    # "apps.careers",  # uncomment when ready
+    "apps.job_market",
 ]
 
 MIDDLEWARE = [
@@ -55,8 +55,8 @@ WSGI_APPLICATION = "config.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("POSTGRES_DB", "carrer_advisor"),
-        "USER": os.environ.get("POSTGRES_USER", "carrer_user"),
+        "NAME": os.environ.get("POSTGRES_DB", "career_advisor"),
+        "USER": os.environ.get("POSTGRES_USER", "career_user"),
         "PASSWORD": os.environ.get("POSTGRES_PASSWORD", ""),
         "HOST": os.environ.get("POSTGRES_HOST", "postgres"),
         "PORT": os.environ.get("POSTGRES_PORT", "5432"),

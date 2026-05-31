@@ -57,6 +57,9 @@ services:
       ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS}
     volumes:
       - ./backend:/app                          # live-reload during development
+      - ./data_en_processed.csv:/data/data_en_processed.csv:ro
+      - ./lightcast_data_formatted.csv:/data/lightcast_data_formatted.csv:ro
+      - ./lightcast_hier_mapper.json:/data/lightcast_hier_mapper.json:ro
     ports:
       - "${DJANGO_PORT:-8000}:8000"
     depends_on:
