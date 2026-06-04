@@ -10,5 +10,5 @@ def health(request):
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("health/", health),
-    # path("api/v1/", include("apps.job_market.urls")),  # uncomment when ready
+    path("api/v1/", include("apps.job_market.urls")),
 ]

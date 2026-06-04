@@ -9,3 +9,7 @@ __pycache__/
 # Django
 staticfiles/
 *.log
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
