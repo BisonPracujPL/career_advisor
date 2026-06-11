@@ -2,6 +2,8 @@ from django.db.models import Count
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from pgvector.django import CosineDistance
+from sentence_transformers import SentenceTransformer
 
 from apps.job_market.constants import MARKET_PILLARS, PILLAR_IDS, POSITION_LEVEL_GROUPS
 from apps.job_market.models import JobOffer, Skill
@@ -16,21 +18,22 @@ class SkillSearchView(APIView):
         limit = min(int(request.query_params.get("limit", 20)), 50)
         if len(q) < 2:
             return Response({"results": []})
-        skills = (
-            Skill.objects.filter(is_category=False, name__icontains=q)
-            .order_by("name")[:limit]
+        skills = Skill.objects.filter(is_category=False, name__icontains=q).order_by(
+            "name"
+        )[:limit]
+        return Response(
+            {
+                "results": [
+                    {
+                        "id": s.id,
+                        "name": s.name,
+                        "main_category": s.main_category,
+                        "subcategory": s.subcategory,
+                    }
+                    for s in skills
+                ]
+            }
         )
-        return Response({
-            "results": [
-                {
-                    "id": s.id,
-                    "name": s.name,
-                    "main_category": s.main_category,
-                    "subcategory": s.subcategory,
-                }
-                for s in skills
-            ]
-        })
 
 
 class SkillCategoriesView(APIView):
@@ -44,16 +47,18 @@ class SkillCategoriesView(APIView):
             .annotate(skill_count=Count("id"))
             .order_by("main_category")
         )
-        return Response({
-            "categories": [
-                {
-                    "code": r["main_category_code"],
-                    "name": r["main_category"],
-                    "skill_count": r["skill_count"],
-                }
-                for r in rows
-            ]
-        })
+        return Response(
+            {
+                "categories": [
+                    {
+                        "code": r["main_category_code"],
+                        "name": r["main_category"],
+                        "skill_count": r["skill_count"],
+                    }
+                    for r in rows
+                ]
+            }
+        )
 
 
 class SkillSubcategoriesView(APIView):
@@ -65,17 +70,19 @@ class SkillSubcategoriesView(APIView):
             .annotate(skill_count=Count("id"))
             .order_by("subcategory")
         )
-        return Response({
-            "main_category_code": main_code,
-            "subcategories": [
-                {
-                    "code": r["subcategory_code"],
-                    "name": r["subcategory"],
-                    "skill_count": r["skill_count"],
-                }
-                for r in rows
-            ],
-        })
+        return Response(
+            {
+                "main_category_code": main_code,
+                "subcategories": [
+                    {
+                        "code": r["subcategory_code"],
+                        "name": r["subcategory"],
+                        "skill_count": r["skill_count"],
+                    }
+                    for r in rows
+                ],
+            }
+        )
 
 
 class SkillBrowseView(APIView):
@@ -89,17 +96,19 @@ class SkillBrowseView(APIView):
         if sub_code:
             qs = qs.filter(subcategory_code=sub_code)
         skills = qs.order_by("name")[:limit]
-        return Response({
-            "results": [
-                {
-                    "id": s.id,
-                    "name": s.name,
-                    "main_category": s.main_category,
-                    "subcategory": s.subcategory,
-                }
-                for s in skills
-            ]
-        })
+        return Response(
+            {
+                "results": [
+                    {
+                        "id": s.id,
+                        "name": s.name,
+                        "main_category": s.main_category,
+                        "subcategory": s.subcategory,
+                    }
+                    for s in skills
+                ]
+            }
+        )
 
 
 class MarketPillarsView(APIView):
@@ -114,12 +123,14 @@ class MarketPillarsView(APIView):
             else:
                 main = p["lead_main_exact"][0]
                 count = qs.filter(lead_main_category=main).count()
-            pillars.append({
-                "id": p["id"],
-                "label": p["label"],
-                "description": p.get("description", ""),
-                "offer_count": count,
-            })
+            pillars.append(
+                {
+                    "id": p["id"],
+                    "label": p["label"],
+                    "description": p.get("description", ""),
+                    "offer_count": count,
+                }
+            )
         return Response({"pillars": pillars})
 
 
@@ -143,19 +154,21 @@ class MarketPillarSegmentsView(APIView):
             .annotate(offer_count=Count("id"))
             .order_by("-offer_count")[:50]
         )
-        return Response({
-            "pillar_id": pillar_id,
-            "segments": [
-                {
-                    "lead_main_category": r["lead_main_category"],
-                    "lead_sub_category": r["lead_sub_category"],
-                    "offer_count": r["offer_count"],
-                    "label": f"{r['lead_sub_category']}",
-                    "group_label": r["lead_main_category"],
-                }
-                for r in rows
-            ],
-        })
+        return Response(
+            {
+                "pillar_id": pillar_id,
+                "segments": [
+                    {
+                        "lead_main_category": r["lead_main_category"],
+                        "lead_sub_category": r["lead_sub_category"],
+                        "offer_count": r["offer_count"],
+                        "label": f"{r['lead_sub_category']}",
+                        "group_label": r["lead_main_category"],
+                    }
+                    for r in rows
+                ],
+            }
+        )
 
 
 class FilterOptionsView(APIView):
@@ -172,12 +185,14 @@ class FilterOptionsView(APIView):
             .distinct()
             .order_by("region_name")[:40]
         )
-        return Response({
-            "market_pillars": MARKET_PILLARS,
-            "position_level_groups": POSITION_LEVEL_GROUPS,
-            "regions": regions,
-            "lead_main_categories": categories,
-        })
+        return Response(
+            {
+                "market_pillars": MARKET_PILLARS,
+                "position_level_groups": POSITION_LEVEL_GROUPS,
+                "regions": regions,
+                "lead_main_categories": categories,
+            }
+        )
 
 
 class MatchBySkillsView(APIView):
@@ -197,12 +212,14 @@ class MatchBySkillsView(APIView):
             min_similarity=min_sim,
             filters=filters,
         )
-        return Response({
-            "mode": "skills",
-            "skill_ids": skill_ids,
-            "count": len(results),
-            "offers": results,
-        })
+        return Response(
+            {
+                "mode": "skills",
+                "skill_ids": skill_ids,
+                "count": len(results),
+                "offers": results,
+            }
+        )
 
 
 class MatchSimilarOffersView(APIView):
@@ -239,12 +256,14 @@ class MatchSimilarOffersView(APIView):
                 {"detail": "Oferta nie istnieje lub nie ma wektora skilli."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        return Response({
-            "mode": "offer",
-            "seed": seed,
-            "count": len(results),
-            "offers": results,
-        })
+        return Response(
+            {
+                "mode": "offer",
+                "seed": seed,
+                "count": len(results),
+                "offers": results,
+            }
+        )
 
 
 class OfferSearchView(APIView):
@@ -252,3 +271,75 @@ class OfferSearchView(APIView):
         q = request.query_params.get("q", "")
         limit = min(int(request.query_params.get("limit", 15)), 30)
         return Response({"results": matching.search_offers_by_title(q, limit=limit)})
+
+
+embedding_model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
+
+
+class MatchCandidateJsonView(APIView):
+    """
+    Przyjmuje JSON kandydata (np. CV), wektoryzuje go i znajduje
+    najlepiej dopasowane całe oferty pracy po wektorze pełnego tekstu.
+    """
+
+    def post(self, request):
+        candidate_json = request.data
+
+        # 1. Zabezpieczenie przed pustym requestem
+        if not candidate_json:
+            return Response(
+                {"detail": "Nie podano JSONa kandydata."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 2. Sklejenie wartości JSONa (Doświadczenie, skille, opis) w jeden tekst
+        # Możesz to dostosować pod konkretne klucze, jakie mają te JSONy.
+        skills = ", ".join(candidate_json.get("skills", []))
+        experience = candidate_json.get("experience", "")
+        summary = candidate_json.get("summary", "")
+
+        candidate_text = (
+            f"Kandydat. Podsumowanie: {summary}. "
+            f"Doświadczenie: {experience}. "
+            f"Umiejętności: {skills}."
+        )
+
+        # 3. Zamiana tekstu kandydata na gęsty wektor (embedding)
+        candidate_vector = embedding_model.encode(candidate_text).tolist()
+
+        # 4. Znajdowanie podobieństwa w bazie PostgreSQL używając pgvector
+        limit = int(request.query_params.get("limit", 10))
+
+        # CosineDistance zwraca odległość (im mniejsza tym lepsza).
+        # Cosine Similarity to 1 - CosineDistance.
+        similar_offers = (
+            JobOffer.objects.exclude(full_text_embedding__isnull=True)
+            .annotate(distance=CosineDistance("full_text_embedding", candidate_vector))
+            .order_by("distance")[:limit]
+        )
+
+        # 5. Przygotowanie wyników
+        results = []
+        for offer in similar_offers:
+            similarity = 1.0 - float(
+                offer.distance
+            )  # Zmiana z odległości na % podobieństwa
+            results.append(
+                {
+                    "id": offer.id,
+                    "job_title": offer.job_title,
+                    "lead_main_category": offer.lead_main_category,
+                    "similarity_score": round(
+                        similarity, 3
+                    ),  # Wynik np. 0.852 (czyli ~85%)
+                }
+            )
+
+        return Response(
+            {
+                "mode": "json_full_text_matching",
+                "candidate_text_used": candidate_text,
+                "count": len(results),
+                "offers": results,
+            }
+        )

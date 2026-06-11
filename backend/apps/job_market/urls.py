@@ -11,9 +11,13 @@ urlpatterns = [
     ),
     path("skills/browse/", views.SkillBrowseView.as_view()),
     path("market/pillars/", views.MarketPillarsView.as_view()),
-    path("market/pillars/<str:pillar_id>/segments/", views.MarketPillarSegmentsView.as_view()),
+    path(
+        "market/pillars/<str:pillar_id>/segments/",
+        views.MarketPillarSegmentsView.as_view(),
+    ),
     path("filters/options/", views.FilterOptionsView.as_view()),
     path("match/by-skills/", views.MatchBySkillsView.as_view()),
     path("match/similar/", views.MatchSimilarOffersView.as_view()),
     path("offers/search/", views.OfferSearchView.as_view()),
+    path("match/candidate-json/", views.MatchCandidateJsonView.as_view()),
 ]

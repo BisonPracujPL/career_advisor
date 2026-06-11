@@ -121,8 +121,12 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("csv_path")
         parser.add_argument("--threshold", type=float, default=DEFAULT_SKILL_THRESHOLD)
-        parser.add_argument("--limit", type=int, default=None, help="Stop after N rows.")
-        parser.add_argument("--batch", type=int, default=1000, help="Offers per DB batch.")
+        parser.add_argument(
+            "--limit", type=int, default=None, help="Stop after N rows."
+        )
+        parser.add_argument(
+            "--batch", type=int, default=1000, help="Offers per DB batch."
+        )
         parser.add_argument(
             "--vector-value",
             choices=VECTOR_VALUE_CHOICES,
@@ -200,10 +204,48 @@ class Command(BaseCommand):
         self.stdout.write(f"  {self.n_offers} offers…")
 
     def _build_offer(self, row):
+        from decimal import Decimal, InvalidOperation
+
         data = {field: clean(row.get(col)) or "" for col, field in SCALAR.items()}
+
+        # Automatyczne przycinanie zbyt długich tekstów do limitów bazy danych (np. 255 znaków)
+        for field, value in list(data.items()):
+            max_len = JobOffer._meta.get_field(field).max_length
+            if max_len and len(value) > max_len:
+                data[field] = value[:max_len]
+
         data.update({field: to_list(row.get(col)) for col, field in ARRAYS.items()})
         data.update({field: to_bool(row.get(col)) for col, field in BOOLS.items()})
-        data.update({field: clean(row.get(col)) for col, field in DECIMALS.items()})
+
+        # Bezpieczne wczytywanie liczb dziesiętnych (Decimal) z zabezpieczeniem przed overflow
+        decimal_data = {}
+        for col, field in DECIMALS.items():
+            val_str = clean(row.get(col))
+            if val_str:
+                try:
+                    # Usunięcie spacji (np. "12 000") i zamiana przecinków na kropki
+                    cleaned_val_str = val_str.replace(" ", "").replace(",", ".")
+                    val_dec = Decimal(cleaned_val_str)
+
+                    # Dynamiczne sprawdzanie limitów zdefiniowanych w modelu Django
+                    model_field = JobOffer._meta.get_field(field)
+                    max_digits = model_field.max_digits
+                    decimal_places = model_field.decimal_places
+                    max_integer_digits = max_digits - decimal_places
+
+                    # Jeśli wartość wykracza poza dozwolony limit (np. >= 10^7 dla salary uop/b2b), przycinamy ją
+                    limit_value = 10**max_integer_digits
+                    if abs(val_dec) >= limit_value:
+                        sign = -1 if val_dec < 0 else 1
+                        val_dec = Decimal(limit_value - 1) * sign
+
+                    decimal_data[field] = val_dec
+                except (InvalidOperation, ValueError):
+                    decimal_data[field] = None
+            else:
+                decimal_data[field] = None
+        data.update(decimal_data)
+
         data.update({field: to_dt(row.get(col)) for col, field in DATES.items()})
         mvn = clean(row.get("multipleVacanciesNumber"))
         data["multiple_vacancies_number"] = int(mvn) if mvn and mvn.isdigit() else None

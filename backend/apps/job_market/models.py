@@ -29,7 +29,7 @@ Both match types map onto a dictionary id:
 
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
-from pgvector.django import SparseVectorField
+from pgvector.django import SparseVectorField, VectorField
 
 # Probability threshold above which a skill match is considered reliable enough
 # to "take". In the sample data scores range 0.1..1.0 (median ~0.75, p25 ~0.39),
@@ -82,13 +82,23 @@ class JobOffer(models.Model):
     district = models.CharField(max_length=255, blank=True)
     country_name = models.CharField(max_length=100, blank=True, db_index=True)
     region_name = models.CharField(max_length=100, blank=True, db_index=True)
-    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    latitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True
+    )
+    longitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True
+    )
 
     # ── Categories (CSV stores comma-separated lists → arrays) ────────────
-    main_category_names = ArrayField(models.CharField(max_length=128), default=list, blank=True)
-    sub_category_names = ArrayField(models.CharField(max_length=128), default=list, blank=True)
-    all_category_names = ArrayField(models.CharField(max_length=128), default=list, blank=True)
+    main_category_names = ArrayField(
+        models.CharField(max_length=128), default=list, blank=True
+    )
+    sub_category_names = ArrayField(
+        models.CharField(max_length=128), default=list, blank=True
+    )
+    all_category_names = ArrayField(
+        models.CharField(max_length=128), default=list, blank=True
+    )
     lead_main_category = models.CharField(max_length=128, blank=True)
     lead_sub_category = models.CharField(max_length=128, blank=True)
 
@@ -103,9 +113,15 @@ class JobOffer(models.Model):
     technologies_expected = models.TextField(blank=True)
 
     # ── Multi-value enums (comma-separated lists → arrays) ────────────────
-    position_levels = ArrayField(models.CharField(max_length=128), default=list, blank=True)
-    type_of_contract = ArrayField(models.CharField(max_length=64), default=list, blank=True)
-    work_schedules = ArrayField(models.CharField(max_length=64), default=list, blank=True)
+    position_levels = ArrayField(
+        models.CharField(max_length=128), default=list, blank=True
+    )
+    type_of_contract = ArrayField(
+        models.CharField(max_length=64), default=list, blank=True
+    )
+    work_schedules = ArrayField(
+        models.CharField(max_length=64), default=list, blank=True
+    )
     work_modes = ArrayField(models.CharField(max_length=64), default=list, blank=True)
     keywords = ArrayField(models.CharField(max_length=128), default=list, blank=True)
 
@@ -121,20 +137,31 @@ class JobOffer(models.Model):
     language = models.CharField(max_length=8, blank=True, db_index=True)
 
     # ── Salary: contract of employment (umowa o pracę / "uop") ────────────
-    salary_uop_from = models.DecimalField(max_digits=12, decimal_places=5, null=True, blank=True)
-    salary_uop_to = models.DecimalField(max_digits=12, decimal_places=5, null=True, blank=True)
+    salary_uop_from = models.DecimalField(
+        max_digits=12, decimal_places=5, null=True, blank=True
+    )
+    salary_uop_to = models.DecimalField(
+        max_digits=12, decimal_places=5, null=True, blank=True
+    )
     salary_uop_currency = models.CharField(max_length=8, blank=True)
     salary_uop_duration = models.CharField(max_length=32, blank=True)
     salary_uop_kind = models.CharField(max_length=32, blank=True)
 
     # ── Salary: B2B contract ──────────────────────────────────────────────
-    salary_b2b_from = models.DecimalField(max_digits=12, decimal_places=5, null=True, blank=True)
-    salary_b2b_to = models.DecimalField(max_digits=12, decimal_places=5, null=True, blank=True)
+    salary_b2b_from = models.DecimalField(
+        max_digits=12, decimal_places=5, null=True, blank=True
+    )
+    salary_b2b_to = models.DecimalField(
+        max_digits=12, decimal_places=5, null=True, blank=True
+    )
     salary_b2b_currency = models.CharField(max_length=8, blank=True)
     salary_b2b_duration = models.CharField(max_length=32, blank=True)
     salary_b2b_kind = models.CharField(max_length=32, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
+
+    # Gęsty wektor reprezentujący cały tekst oferty (tytuł + wymagania + obowiązki)
+    full_text_embedding = VectorField(dimensions=384, null=True, blank=True)
 
     class Meta:
         db_table = "job_offer_info"
