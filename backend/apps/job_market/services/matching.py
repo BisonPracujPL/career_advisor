@@ -8,7 +8,14 @@ from pgvector.django import CosineDistance
 
 from apps.job_market.constants import LEVEL_VALUES_BY_GROUP, PILLAR_IDS
 from apps.job_market.models import ExtractedSkills, JobOffer, Skill
-from apps.job_market.vectors import build_skill_vector, skill_index_map
+from apps.job_market.vectors import (
+    build_skill_vector,
+    skill_idf_map,
+    skill_index_map,
+)
+
+# Skill-vector matching mode: tfidf down-weights generic LightCast skills.
+SKILL_VECTOR_VALUE = "tfidf"
 
 
 def vector_dimension() -> int:
@@ -17,13 +24,16 @@ def vector_dimension() -> int:
 
 
 def build_profile_vector(skill_ids: list[str]):
-    """Sparse user profile from selected LightCast skill ids (binary weights)."""
+    """Sparse user profile from selected LightCast skill ids (TF-IDF weights)."""
     index_map = skill_index_map()
     dim = len(index_map)
     if not dim or not skill_ids:
         return None
     skills = [{"skill_id": sid, "probability": 1.0} for sid in skill_ids]
-    return build_skill_vector(skills, index_map, dim, value="binary")
+    idf_map = skill_idf_map() if SKILL_VECTOR_VALUE == "tfidf" else None
+    return build_skill_vector(
+        skills, index_map, dim, value=SKILL_VECTOR_VALUE, idf_map=idf_map
+    )
 
 
 def _pillar_q(pillar_id: str) -> Q:

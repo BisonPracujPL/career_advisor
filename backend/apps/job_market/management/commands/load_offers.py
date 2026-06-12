@@ -28,6 +28,7 @@ from apps.job_market.models import (
 from apps.job_market.vectors import (
     VECTOR_VALUE_CHOICES,
     build_skill_vector,
+    skill_idf_map,
     skill_index_map,
 )
 
@@ -131,8 +132,8 @@ class Command(BaseCommand):
             "--vector-value",
             choices=VECTOR_VALUE_CHOICES,
             default="binary",
-            help="Value stored per present skill in skill_vector: "
-            "'binary' (1.0) or 'probability' (match score).",
+            help="Value per skill in skill_vector: 'binary', 'probability', or "
+            "'tfidf' (run compute_skill_idf + build_skill_vectors after import).",
         )
 
     def handle(self, *args, **opts):
@@ -151,6 +152,9 @@ class Command(BaseCommand):
             )
         # skill_id -> vector position; the vector's dimension is the dictionary size.
         self.index_map = skill_index_map()
+        self.idf_map = (
+            skill_idf_map() if self.vector_value == "tfidf" else None
+        )
         self.vector_dim = len(self.index_map)
         if known_skill_ids and not self.vector_dim:
             self.stderr.write(
@@ -193,7 +197,11 @@ class Command(BaseCommand):
                 offer=offer,
                 skills=skills,
                 skill_vector=build_skill_vector(
-                    skills, self.index_map, self.vector_dim, self.vector_value
+                    skills,
+                    self.index_map,
+                    self.vector_dim,
+                    self.vector_value,
+                    idf_map=self.idf_map,
                 ),
             )
             for offer, (_, skills) in zip(offers, batch)

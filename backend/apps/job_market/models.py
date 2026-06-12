@@ -65,6 +65,10 @@ class Skill(models.Model):
     # Assigned by ``load_skills`` after the dictionary is fully loaded.
     vector_index = models.IntegerField(null=True, blank=True, unique=True)
 
+    # Smoothed IDF over the offer corpus: log((N+1)/(df+1))+1. Used for TF-IDF
+    # weights in ExtractedSkills.skill_vector (see compute_skill_idf).
+    idf_weight = models.FloatField(default=1.0)
+
     class Meta:
         db_table = "skills_dict"
         ordering = ["name"]

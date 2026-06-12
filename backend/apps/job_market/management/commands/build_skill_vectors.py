@@ -7,7 +7,7 @@ dictionary. It reads each offer's ``skills`` JSON and writes ``skill_vector``.
 Usage (inside the backend container)::
 
     python manage.py build_skill_vectors
-    python manage.py build_skill_vectors --vector-value probability --batch 2000
+    python manage.py build_skill_vectors --vector-value tfidf --batch 2000
 
 Requires the skill dictionary to be loaded and indexed first (``load_skills``),
 otherwise there is no ``vector_index`` mapping to build vectors from.
@@ -20,6 +20,7 @@ from apps.job_market.models import ExtractedSkills
 from apps.job_market.vectors import (
     VECTOR_VALUE_CHOICES,
     build_skill_vector,
+    skill_idf_map,
     skill_index_map,
 )
 
@@ -32,8 +33,8 @@ class Command(BaseCommand):
             "--vector-value",
             choices=VECTOR_VALUE_CHOICES,
             default="binary",
-            help="Value stored per present skill: 'binary' (1.0) or "
-            "'probability' (match score).",
+            help="Value per skill: 'binary' (1.0), 'probability' (match score), "
+            "or 'tfidf' (probability×IDF; run compute_skill_idf first).",
         )
         parser.add_argument("--batch", type=int, default=1000, help="Rows per DB batch.")
 
@@ -41,6 +42,7 @@ class Command(BaseCommand):
         value, batch_size = opts["vector_value"], opts["batch"]
 
         index_map = skill_index_map()
+        idf_map = skill_idf_map() if value == "tfidf" else None
         dim = len(index_map)
         if not dim:
             self.stderr.write(
@@ -54,7 +56,9 @@ class Command(BaseCommand):
         bucket = []
         qs = ExtractedSkills.objects.all().iterator(chunk_size=batch_size)
         for es in qs:
-            es.skill_vector = build_skill_vector(es.skills, index_map, dim, value)
+            es.skill_vector = build_skill_vector(
+                es.skills, index_map, dim, value, idf_map=idf_map
+            )
             bucket.append(es)
             if len(bucket) >= batch_size:
                 total += self._flush(bucket)
