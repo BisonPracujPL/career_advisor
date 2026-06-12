@@ -675,6 +675,25 @@ body {
   box-shadow: 0 4px 20px rgba(15, 28, 52, 0.06);
 }
 
+.score-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+  width: 56px;
+}
+
+.score-label {
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.2;
+}
+
 .score-ring {
   position: relative;
   flex-shrink: 0;
@@ -748,6 +767,16 @@ body {
   background: linear-gradient(90deg, var(--ok), #3db88a);
   border-radius: 2px;
   transition: width 0.35s ease;
+}
+
+.skill-bar-fill--coverage {
+  background: linear-gradient(90deg, #6b8fc7, #4a6fa5);
+}
+
+.results-sub {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  max-width: 42rem;
 }
 
 .skill-summary {

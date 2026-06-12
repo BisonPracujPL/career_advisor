@@ -120,11 +120,14 @@ function Chip({ label, onRemove, variant = "skill" }) {
 
 function OfferCard({ offer }) {
   const ov = offer.overlap;
-  const pct = offer.display_pct ?? offer.similarity_pct ?? 0;
-  const vectorPct = offer.similarity_pct ?? 0;
+  const matchPct = offer.similarity_pct ?? offer.display_pct ?? 0;
+  const coveragePct = ov?.offer_coverage_pct ?? 0;
   return (
     <article className="offer-card">
-      <ScoreRing pct={pct} />
+      <div className="score-block">
+        <ScoreRing pct={matchPct} />
+        <span className="score-label">Dopasowanie</span>
+      </div>
       <div className="offer-body">
         <h3>{offer.job_title}</h3>
         <p className="offer-meta">
@@ -139,15 +142,14 @@ function OfferCard({ offer }) {
           <div className="offer-skills">
             <div className="skill-bar">
               <div
-                className="skill-bar-fill"
-                style={{
-                  width: `${ov.offer_skill_count ? (100 * ov.matched_count) / ov.offer_skill_count : 0}%`,
-                }}
+                className="skill-bar-fill skill-bar-fill--coverage"
+                style={{ width: `${coveragePct}%` }}
               />
             </div>
             <p className="skill-summary">
-              Spełniasz <strong>{ov.matched_count}</strong> z{" "}
-              <strong>{ov.offer_skill_count}</strong> wymagań oferty
+              Pokrycie oferty: <strong>{coveragePct}%</strong> — spełniasz{" "}
+              <strong>{ov.matched_count}</strong> z{" "}
+              <strong>{ov.offer_skill_count}</strong> wymagań
               {ov.profile_skill_count > 0 && (
                 <>
                   {" "}
@@ -155,14 +157,6 @@ function OfferCard({ offer }) {
                 </>
               )}
             </p>
-            {vectorPct !== pct && (
-              <p className="skill-hint muted">
-                Cosine (kolejność wyników): {vectorPct}%
-                {ov.profile_skill_count > 0 &&
-                  ov.profile_skill_count < ov.offer_skill_count &&
-                  ` — profil ma ${ov.profile_skill_count} skilli w wektorze, oferta ${ov.offer_skill_count}`}
-              </p>
-            )}
             {ov.matched_skills.length > 0 && (
               <div className="chips-row">
                 {ov.matched_skills.slice(0, 6).map((s) => (
@@ -688,7 +682,15 @@ export default function App() {
 
         <main className="panel panel-main">
           <div className="results-head">
-            <h2>Rekomendowane oferty</h2>
+            <div>
+              <h2>Rekomendowane oferty</h2>
+              {resultMeta?.count > 0 && mode === "skills" && (
+                <p className="results-sub muted">
+                  Posortowane wg cosine na wektorach TF-IDF (rzadsze skille ważą
+                  więcej). Pierścień = dopasowanie, pasek = pokrycie wymagań oferty.
+                </p>
+              )}
+            </div>
             {resultMeta?.count > 0 && (
               <span className="badge-count">{resultMeta.count} wyników</span>
             )}

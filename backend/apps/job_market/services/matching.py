@@ -135,12 +135,8 @@ def serialize_offer_row(es: ExtractedSkills, similarity: float, user_skill_ids: 
         "position_levels": offer.position_levels or [],
         "similarity": round(similarity, 4),
         "similarity_pct": int(round(similarity * 100)),
-        # Intuitive % for UI: share of offer requirements met (not cosine).
-        "display_pct": (
-            overlap["offer_coverage_pct"]
-            if overlap is not None
-            else int(round(similarity * 100))
-        ),
+        # Primary UI score: TF-IDF cosine (same metric as sort order).
+        "display_pct": int(round(similarity * 100)),
         "overlap": overlap,
     }
 
