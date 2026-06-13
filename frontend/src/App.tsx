@@ -69,6 +69,8 @@ export default function App() {
   }, [isLoggedIn, showProfileWizard]);
 
   useEffect(() => {
+    if (!isLoggedIn) return;
+    setError("");
     api
       .filterOptions()
       .then(setFilterOpts)
@@ -81,7 +83,7 @@ export default function App() {
       .categories()
       .then((d) => setCategories(d.categories))
       .catch(() => {});
-  }, []);
+  }, [isLoggedIn]);
 
   useEffect(() => {
     if (!filters.market_pillar) {

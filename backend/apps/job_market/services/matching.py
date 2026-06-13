@@ -166,7 +166,12 @@ def find_similar_offers(
     candidates = list(qs.order_by("distance")[: max(limit * 8, 50)])
     results = []
     for es in candidates:
-        sim = 1.0 - float(es.distance)
+        if es.distance is None:
+            continue
+        dist = float(es.distance)
+        if dist != dist:  # Check for NaN
+            continue
+        sim = 1.0 - dist
         if sim < min_similarity:
             continue
         results.append(serialize_offer_row(es, sim, user_skill_ids))
