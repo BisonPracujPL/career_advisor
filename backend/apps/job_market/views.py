@@ -1,3 +1,4 @@
+import random
 from django.db.models import Count
 from rest_framework import status
 from rest_framework.response import Response
@@ -273,6 +274,46 @@ class OfferSearchView(APIView):
         return Response({"results": matching.search_offers_by_title(q, limit=limit)})
 
 
+class OfferCategoriesView(APIView):
+    def get(self, request):
+        pairs = JobOffer.objects.exclude(lead_main_category="").values_list("lead_main_category", "lead_sub_category").distinct()
+        
+        tree = {}
+        for main, sub in pairs:
+            if main not in tree:
+                tree[main] = set()
+            if sub:
+                tree[main].add(sub)
+                
+        categories = []
+        for main in sorted(tree.keys()):
+            categories.append({
+                "code": main,
+                "name": main,
+                "subcategories": [{"code": s, "name": s} for s in sorted(tree[main])]
+            })
+            
+        return Response({"categories": categories})
+
+
+class OfferSubcategoriesView(APIView):
+    def get(self, request, main_cat: str):
+        subcategories = list(
+            JobOffer.objects.filter(lead_main_category=main_cat)
+            .exclude(lead_sub_category="")
+            .values_list("lead_sub_category", flat=True)
+            .distinct()
+            .order_by("lead_sub_category")
+        )
+        return Response(
+            {
+                "subcategories": [
+                    {"code": s, "name": s} for s in subcategories
+                ]
+            }
+        )
+
+
 embedding_model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
 
 
@@ -343,3 +384,94 @@ class MatchCandidateJsonView(APIView):
                 "offers": results,
             }
         )
+
+
+from django.contrib.auth.models import User
+from django.contrib.auth import authenticate
+from rest_framework.authtoken.models import Token
+from rest_framework.permissions import IsAuthenticated
+
+from apps.job_market.models import UserProfile
+from apps.job_market.validators import validate_user_profile
+
+class RegisterView(APIView):
+    def post(self, request):
+        username = request.data.get("username")
+        password = request.data.get("password")
+        if not username or not password:
+            return Response({"detail": "Username and password are required."}, status=status.HTTP_400_BAD_REQUEST)
+        if User.objects.filter(username=username).exists():
+            return Response({"detail": "Username already exists."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        user = User.objects.create_user(username=username, password=password)
+        token, _ = Token.objects.get_or_create(user=user)
+        return Response({"token": token.key}, status=status.HTTP_201_CREATED)
+
+
+class LoginView(APIView):
+    def post(self, request):
+        username = request.data.get("username")
+        password = request.data.get("password")
+        user = authenticate(username=username, password=password)
+        if not user:
+            return Response({"detail": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
+        token, _ = Token.objects.get_or_create(user=user)
+        return Response({"token": token.key}, status=status.HTTP_200_OK)
+
+
+class UserProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        profile, _ = UserProfile.objects.get_or_create(user=request.user)
+        return Response({"profile_data": profile.profile_data})
+
+    def post(self, request):
+        data = request.data
+        validation = validate_user_profile(data)
+        if not validation["is_valid"]:
+            return Response({"detail": validation["error"]}, status=status.HTTP_400_BAD_REQUEST)
+        
+        profile, _ = UserProfile.objects.get_or_create(user=request.user)
+        profile.profile_data = data
+        profile.save()
+        return Response({"detail": "Profile saved successfully.", "profile_data": profile.profile_data})
+
+class SkillRecommendView(APIView):
+    def post(self, request):
+        current_skills = request.data.get("skills", [])
+        
+        base_qs = Skill.objects.filter(is_category=False).exclude(name__in=current_skills).order_by("idf_weight")
+        
+        if current_skills:
+            subcats = list(Skill.objects.filter(name__in=current_skills).values_list("subcategory_code", flat=True).distinct())
+            pool = list(base_qs.filter(subcategory_code__in=subcats)[:60])
+            
+            if len(pool) > 15:
+                recommended = random.sample(pool, 15)
+            else:
+                recommended = pool
+            
+            if len(recommended) < 10:
+                needed = 15 - len(recommended)
+                exclude_names = current_skills + [s.name for s in recommended]
+                extra_pool = list(Skill.objects.filter(is_category=False).exclude(name__in=exclude_names).order_by("idf_weight")[:60])
+                if len(extra_pool) > needed:
+                    extra = random.sample(extra_pool, needed)
+                else:
+                    extra = extra_pool
+                recommended.extend(extra)
+        else:
+            pool = list(base_qs[:60])
+            recommended = random.sample(pool, 15) if len(pool) > 15 else pool
+
+        data = [
+            {
+                "id": s.id,
+                "name": s.name,
+                "main_category": s.main_category,
+                "subcategory": s.subcategory,
+            }
+            for s in recommended
+        ]
+        return Response({"results": data})

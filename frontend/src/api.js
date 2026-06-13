@@ -2,9 +2,15 @@ const API = import.meta.env.VITE_API_URL || "";
 
 async function request(path, options = {}) {
   let res;
+  const token = localStorage.getItem("auth_token");
+  const headers = { "Content-Type": "application/json", ...options.headers };
+  if (token) {
+    headers["Authorization"] = `Token ${token}`;
+  }
+
   try {
     res = await fetch(`${API}${path}`, {
-      headers: { "Content-Type": "application/json", ...options.headers },
+      headers,
       ...options,
     });
   } catch {
@@ -23,16 +29,42 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  login: (username, password) =>
+    request("/api/v1/auth/login/", {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+    }),
+  register: (username, password) =>
+    request("/api/v1/auth/register/", {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+    }),
+  getProfile: () => request("/api/v1/profile/"),
+  saveProfile: (data) =>
+    request("/api/v1/profile/", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
   marketPillars: () => request("/api/v1/market/pillars/"),
   pillarSegments: (pillarId) =>
     request(`/api/v1/market/pillars/${encodeURIComponent(pillarId)}/segments/`),
   filterOptions: () => request("/api/v1/filters/options/"),
   searchSkills: (q) =>
     request(`/api/v1/skills/search/?q=${encodeURIComponent(q)}&limit=20`),
+  recommendSkills: (skills) =>
+    request("/api/v1/skills/recommend/", {
+      method: "POST",
+      body: JSON.stringify({ skills }),
+    }),
   categories: () => request("/api/v1/skills/categories/"),
   subcategories: (code) =>
     request(
       `/api/v1/skills/categories/${encodeURIComponent(code)}/subcategories/`
+    ),
+  offerCategories: () => request("/api/v1/offers/categories/"),
+  offerSubcategories: (name) =>
+    request(
+      `/api/v1/offers/categories/${encodeURIComponent(name)}/subcategories/`
     ),
   browseSkills: (mainCode, subCode) => {
     const p = new URLSearchParams({ limit: "40" });

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api.js";
+import Auth from "./Auth.jsx";
+import UserProfileWizard from "./UserProfileWizard.jsx";
 
 const MODES = [
   { id: "skills", label: "Profil kompetencji", icon: "◆" },
@@ -181,6 +183,126 @@ function OfferCard({ offer }) {
   );
 }
 
+function ProfileWidget({ data, onEdit, isDropdown }) {
+  if (!data) return null;
+  return (
+    <div className={isDropdown ? "" : "panel"} style={{ margin: isDropdown ? "0" : "1rem 2rem", background: isDropdown ? "transparent" : "var(--surface)", border: isDropdown ? "none" : "1px solid var(--border)", borderRadius: isDropdown ? "0" : "16px", padding: isDropdown ? "0.5rem" : "1.5rem" }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <h3 style={{ margin: 0, fontSize: isDropdown ? '1.1rem' : '1.25rem' }}>Twój Profil Kariery</h3>
+        <button type="button" className="btn-secondary" style={isDropdown ? { padding: '0.4rem 0.8rem', fontSize: '0.85rem' } : {}} onClick={onEdit}>Edytuj profil</button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: isDropdown ? 'repeat(4, minmax(180px, 1fr))' : 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
+        <div>
+          <h4 style={{ color: 'var(--muted)', fontSize: '0.9rem', marginBottom: '0.5rem', textTransform: 'uppercase' }}>Doświadczenie</h4>
+          {data.experience?.length ? (
+            <ul style={{ paddingLeft: '1.2rem', margin: 0, fontSize: '0.9rem' }}>
+              {data.experience.map((e, i) => <li key={i}>{e.job_title} ({e.company_name})</li>)}
+            </ul>
+          ) : <span className="muted" style={{ fontSize: '0.9rem' }}>Brak dodanego doświadczenia</span>}
+        </div>
+        <div>
+          <h4 style={{ color: 'var(--muted)', fontSize: '0.9rem', marginBottom: '0.5rem', textTransform: 'uppercase' }}>Wykształcenie</h4>
+          {data.education?.length ? (
+            <ul style={{ paddingLeft: '1.2rem', margin: 0, fontSize: '0.9rem' }}>
+              {data.education.map((e, i) => <li key={i}>{e.degree_level} - {e.field_of_study}</li>)}
+            </ul>
+          ) : <span className="muted" style={{ fontSize: '0.9rem' }}>Brak dodanego wykształcenia</span>}
+        </div>
+        <div>
+          <h4 style={{ color: 'var(--muted)', fontSize: '0.9rem', marginBottom: '0.5rem', textTransform: 'uppercase' }}>Top Kompetencje</h4>
+          {data.hard_skills?.length ? (
+            <div className="chips-row">
+              {data.hard_skills.slice(0, 5).map((s, i) => <span key={i} className="chip chip-skill" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }}>{s.name}</span>)}
+            </div>
+          ) : <span className="muted" style={{ fontSize: '0.9rem' }}>Brak dodanych kompetencji</span>}
+        </div>
+        <div>
+          <h4 style={{ color: 'var(--muted)', fontSize: '0.9rem', marginBottom: '0.5rem', textTransform: 'uppercase' }}>Języki & Branże</h4>
+          <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem' }}>
+            <strong>Języki:</strong> {data.languages?.map(l => l.name).join(", ") || "Brak"}
+          </p>
+          <p style={{ margin: 0, fontSize: '0.9rem' }}>
+            <strong>Branże:</strong> {data.interested_industries?.map(g => 
+              typeof g === 'string' ? g : `${g.main} (${g.subs.includes('__ALL__') ? 'Cały obszar' : g.subs.length + ' spec.'})`
+            ).join(", ") || "Brak"}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Navbar({ mode, setMode, isLoggedIn, setShowAuth, handleLogout, onProfileClick, hasProfile, profileData }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    const close = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
+    };
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, []);
+
+  return (
+    <nav className="global-nav">
+      <div className="global-nav-content">
+        <div className="global-nav-left">
+          <a href="#" className="global-nav-brand" onClick={(e) => { e.preventDefault(); setMode("skills"); }}>
+            career advisor
+          </a>
+          <div className="global-nav-links">
+            {MODES.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                className={`global-nav-link ${mode === m.id ? "active" : ""}`}
+                onClick={() => setMode(m.id)}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        
+        <div className="global-nav-right">
+          {!isLoggedIn ? (
+            <button type="button" className="nav-user-btn" onClick={() => setShowAuth(true)}>
+              <span className="nav-user-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+              </span>
+              Zaloguj się
+            </button>
+          ) : (
+            <div className="nav-user-dropdown" ref={menuRef}>
+              <button type="button" className="nav-user-btn" onClick={() => setMenuOpen(!menuOpen)}>
+                <span className="nav-user-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                </span>
+                Moje konto <span style={{fontSize: '0.8em', marginLeft: '0.2rem'}}>{menuOpen ? '▲' : '▼'}</span>
+              </button>
+              
+              {menuOpen && (
+                <div className="nav-dropdown-menu">
+                  <button type="button" className="nav-dropdown-item" onClick={() => { setMenuOpen(false); onProfileClick(); }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                    Mój profil
+                  </button>
+                  <hr style={{ margin: "0.25rem 0", border: "none", borderTop: "1px solid var(--border)" }} />
+                  <button type="button" className="nav-dropdown-item" onClick={() => { setMenuOpen(false); handleLogout(); }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                    Wyloguj się
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </nav>
+  );
+}
+
 export default function App() {
   const [mode, setMode] = useState("skills");
   const [filterOpts, setFilterOpts] = useState(null);
@@ -212,6 +334,28 @@ export default function App() {
   const [resultMeta, setResultMeta] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("auth_token"));
+  const [showAuth, setShowAuth] = useState(!localStorage.getItem("auth_token"));
+  const [hasProfile, setHasProfile] = useState(false);
+  const [profileData, setProfileData] = useState(null);
+  const [showProfileWizard, setShowProfileWizard] = useState(false);
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      api.getProfile().then((d) => {
+        const hasData = !!d.profile_data && Object.keys(d.profile_data).length > 0;
+        setHasProfile(hasData);
+        if (hasData) {
+          setProfileData(d.profile_data);
+        }
+      }).catch(() => {
+        setIsLoggedIn(false);
+        localStorage.removeItem("auth_token");
+        setShowAuth(true);
+      });
+    }
+  }, [isLoggedIn, showProfileWizard]);
 
   useEffect(() => {
     api
@@ -386,35 +530,66 @@ export default function App() {
 
   const levelGroups = filterOpts?.position_level_groups || [];
 
+  const handleLogout = () => {
+    localStorage.removeItem("auth_token");
+    setIsLoggedIn(false);
+    setHasProfile(false);
+    setShowProfileWizard(false);
+  };
+
+  const navProps = {
+    mode, 
+    setMode: (m) => {
+      setMode(m);
+      setOffers([]);
+      setError("");
+      setResultMeta(null);
+      setShowProfileWizard(false);
+    },
+    isLoggedIn,
+    setShowAuth,
+    handleLogout,
+    onProfileClick: () => setShowProfileWizard(true),
+    hasProfile,
+    profileData
+  };
+
+  if (showProfileWizard) {
+    return (
+      <>
+        <Navbar {...navProps} />
+        <UserProfileWizard
+          onComplete={(data) => {
+            setHasProfile(true);
+            setShowProfileWizard(false);
+          }}
+          onCancel={() => setShowProfileWizard(false)}
+        />
+      </>
+    );
+  }
+
   return (
-    <div className="app">
-      <header className="topbar">
-        <div className="brand">
-          <span className="brand-mark">CA</span>
-          <div>
-            <h1>Career Advisor</h1>
-            <p>Dopasuj oferty do swoich kompetencji na podstawie danych rynku pracy</p>
-          </div>
+    <>
+      <Navbar {...navProps} />
+      <div className="app">
+
+      {showAuth && (
+        <Auth
+          onAuthSuccess={() => {
+            setShowAuth(false);
+            setIsLoggedIn(true);
+          }}
+        />
+      )}
+
+      {isLoggedIn && !hasProfile && (
+        <div className="alert" style={{ margin: "1rem 2rem", cursor: "pointer" }} onClick={() => setShowProfileWizard(true)}>
+          Wypełnij formularz profilowy, abyśmy mogli polecić Ci lepsze oferty pracy. <strong>Kliknij tutaj.</strong>
         </div>
-        <nav className="mode-nav">
-          {MODES.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              className={mode === m.id ? "mode-btn active" : "mode-btn"}
-              onClick={() => {
-                setMode(m.id);
-                setOffers([]);
-                setError("");
-                setResultMeta(null);
-              }}
-            >
-              <span className="mode-icon">{m.icon}</span>
-              {m.label}
-            </button>
-          ))}
-        </nav>
-      </header>
+      )}
+
+
 
       <section className="market-hero panel">
         <h2 className="market-hero__title">Wybierz obszar rynku</h2>
@@ -729,5 +904,6 @@ export default function App() {
         </main>
       </div>
     </div>
+    </>
   );
 }

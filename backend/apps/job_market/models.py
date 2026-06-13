@@ -211,3 +211,23 @@ class ExtractedSkills(models.Model):
 
     def __str__(self) -> str:
         return f"offer {self.offer_id}: {len(self.skills)} skills"
+
+
+class UserProfile(models.Model):
+    """Stores the JSON profile for a registered user."""
+    from django.contrib.auth.models import User
+    
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="profile"
+    )
+    profile_data = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "user_profile"
+
+    def __str__(self) -> str:
+        return f"Profile for {self.user.username}"
