@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, ReactNode } from "react";
 import { api } from "./api";
+import { UserProfile, ExperienceItem as ExpType, EducationItem as EduType, Skill, LanguageItem as LangType, IndustryItem } from "./types";
 
 const STEPS = [
   { name: "Doświadczenie", desc: "Historia zatrudnienia" },
@@ -9,7 +10,22 @@ const STEPS = [
   { name: "Branże", desc: "Obszary rynku" }
 ];
 
-function WizardLayout({ step, totalSteps, title, subtitle, children, onNext, onPrev, onSave, saving, disableNext, onCancel, setStep }) {
+interface WizardLayoutProps {
+  step: number;
+  totalSteps: number;
+  title: string;
+  subtitle?: string;
+  children: ReactNode;
+  onNext: () => void;
+  onPrev: () => void;
+  onSave: () => void;
+  saving: boolean;
+  disableNext?: boolean;
+  onCancel?: () => void;
+  setStep?: (step: number) => void;
+}
+
+function WizardLayout({ step, totalSteps, title, children, onNext, onPrev, onSave, saving, disableNext, onCancel, setStep }: WizardLayoutProps) {
   return (
     <div className="wizard-page" style={{ position: "relative" }}>
       {onCancel && (
@@ -62,8 +78,8 @@ function WizardLayout({ step, totalSteps, title, subtitle, children, onNext, onP
   );
 }
 
-function StepIndustries({ data, onChange }) {
-  const [categories, setCategories] = useState([]);
+function StepIndustries({ data, onChange }: { data: IndustryItem[], onChange: (d: IndustryItem[]) => void }) {
+  const [categories, setCategories] = useState<any[]>([]);
   const [mainCat, setMainCat] = useState("");
 
   useEffect(() => {
@@ -74,11 +90,11 @@ function StepIndustries({ data, onChange }) {
     return data.map(item => {
       if (typeof item === 'string') {
         const cat = categories.find(c => c.name === item);
-        return { main: item, subs: cat ? cat.subcategories.map(s => s.name) : [] };
+        return { main: item, subs: cat ? cat.subcategories.map((s: any) => s.name) : [] };
       }
       if (item && Array.isArray(item.subs) && item.subs.includes('__ALL__')) {
         const cat = categories.find(c => c.name === item.main);
-        return { main: item.main, subs: cat ? cat.subcategories.map(s => s.name) : [] };
+        return { main: item.main, subs: cat ? cat.subcategories.map((s: any) => s.name) : [] };
       }
       return item;
     });
@@ -87,10 +103,10 @@ function StepIndustries({ data, onChange }) {
   const subCats = categories.find(c => c.code === mainCat)?.subcategories || [];
   const mainCatName = categories.find(c => c.code === mainCat)?.name;
   const activeGroup = normalizedData.find(g => g.main === mainCatName) || { subs: [] };
-  const allCurrentSubs = subCats.map(s => s.name);
-  const isAllSelected = subCats.length > 0 && activeGroup.subs.length === subCats.length && allCurrentSubs.every(s => activeGroup.subs.includes(s));
+  const allCurrentSubs = subCats.map((s: any) => s.name);
+  const isAllSelected = subCats.length > 0 && activeGroup.subs.length === subCats.length && allCurrentSubs.every((s: string) => activeGroup.subs.includes(s));
 
-  const toggle = (main, sub) => {
+  const toggle = (main: string, sub: string) => {
     let newData = [...normalizedData];
     let groupIdx = newData.findIndex(g => g.main === main);
 
@@ -127,7 +143,7 @@ function StepIndustries({ data, onChange }) {
     onChange(newData);
   };
 
-  const removeGroup = (main) => {
+  const removeGroup = (main: string) => {
     onChange(normalizedData.filter(g => g.main !== main));
   };
 
@@ -171,7 +187,7 @@ function StepIndustries({ data, onChange }) {
               Cała branża
             </button>
 
-            {subCats.map(sub => {
+            {subCats.map((sub: any) => {
               const isSelected = activeGroup.subs.includes(sub.name);
               return (
                 <button
@@ -218,7 +234,7 @@ function StepIndustries({ data, onChange }) {
   );
 }
 
-function SelectedDomainGroup({ group, onToggle, onRemoveGroup }) {
+function SelectedDomainGroup({ group, onToggle, onRemoveGroup }: { group: any, onToggle: (sub: string) => void, onRemoveGroup: () => void }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -256,7 +272,7 @@ function SelectedDomainGroup({ group, onToggle, onRemoveGroup }) {
 
       {expanded && (
         <div className="profile-chips" style={{ marginTop: "1rem", paddingTop: "1rem", borderTop: "1px solid var(--border)" }}>
-          {group.subs.map(sub => (
+          {group.subs.map((sub: string) => (
             <span key={sub} className="chip" style={{ background: "#fff", border: "1px solid var(--border)", padding: "0.35rem 0.75rem" }}>
               {sub} <button type="button" className="chip-x" onClick={(e) => { e.stopPropagation(); onToggle(sub); }}>×</button>
             </span>
@@ -267,7 +283,7 @@ function SelectedDomainGroup({ group, onToggle, onRemoveGroup }) {
   );
 }
 
-function StepExperience({ data, onChange }) {
+function StepExperience({ data, onChange }: { data: ExpType[], onChange: (d: ExpType[]) => void }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ job_title: "", company_name: "", years: 0, months: 0 });
 
@@ -280,7 +296,7 @@ function StepExperience({ data, onChange }) {
     }
   };
 
-  const remove = (index) => onChange(data.filter((_, i) => i !== index));
+  const remove = (index: number) => onChange(data.filter((_, i) => i !== index));
 
   return (
     <>
@@ -337,7 +353,7 @@ function StepExperience({ data, onChange }) {
   );
 }
 
-function StepEducation({ data, onChange }) {
+function StepEducation({ data, onChange }: { data: EduType[], onChange: (d: EduType[]) => void }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ university_name: "", field_of_study: "", degree_level: "" });
 
@@ -349,7 +365,7 @@ function StepEducation({ data, onChange }) {
     }
   };
 
-  const remove = (index) => onChange(data.filter((_, i) => i !== index));
+  const remove = (index: number) => onChange(data.filter((_, i) => i !== index));
 
   return (
     <>
@@ -404,25 +420,25 @@ function StepEducation({ data, onChange }) {
   );
 }
 
-function StepSkillsCombined({ data, onChange }) {
+function StepSkillsCombined({ data, onChange }: { data: Skill[], onChange: (d: Skill[]) => void }) {
   const [query, setQuery] = useState("");
-  const [hits, setHits] = useState([]);
+  const [hits, setHits] = useState<any[]>([]);
 
   // Browsing states
   const [viewMode, setViewMode] = useState('search');
-  const [categories, setCategories] = useState([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [mainCode, setMainCode] = useState("");
-  const [subcategories, setSubcategories] = useState([]);
+  const [subcategories, setSubcategories] = useState<any[]>([]);
   const [subCode, setSubCode] = useState("");
-  const [browseHits, setBrowseHits] = useState([]);
-  const [recommendedSkills, setRecommendedSkills] = useState([]);
+  const [browseHits, setBrowseHits] = useState<any[]>([]);
+  const [recommendedSkills, setRecommendedSkills] = useState<any[]>([]);
 
   // Collapse states for selected skills
-  const [expandedMainCats, setExpandedMainCats] = useState({});
-  const [expandedSubCats, setExpandedSubCats] = useState({});
+  const [expandedMainCats, setExpandedMainCats] = useState<Record<string, boolean>>({});
+  const [expandedSubCats, setExpandedSubCats] = useState<Record<string, boolean>>({});
 
-  const toggleMainCat = (cat) => setExpandedMainCats(prev => ({ ...prev, [cat]: !prev[cat] }));
-  const toggleSubCat = (sub) => setExpandedSubCats(prev => ({ ...prev, [sub]: !prev[sub] }));
+  const toggleMainCat = (cat: string) => setExpandedMainCats(prev => ({ ...prev, [cat]: !prev[cat] }));
+  const toggleSubCat = (sub: string) => setExpandedSubCats(prev => ({ ...prev, [sub]: !prev[sub] }));
 
   // Fetch categories on mount
   useEffect(() => {
@@ -471,7 +487,7 @@ function StepSkillsCombined({ data, onChange }) {
     return () => clearTimeout(t);
   }, [query]);
 
-  const addSkill = (skillObj) => {
+  const addSkill = (skillObj: any) => {
     if (!data.find((s) => s.name === skillObj.name)) {
       onChange([...data, {
         name: skillObj.name,
@@ -483,22 +499,19 @@ function StepSkillsCombined({ data, onChange }) {
     setHits([]);
   };
 
-  const removeSkill = (name) => {
+  const removeSkill = (name: string) => {
     onChange(data.filter((s) => s.name !== name));
   };
 
-  const removeMainCategory = (mainCat, e) => {
-    e.stopPropagation();
-    onChange(data.filter(s => (s.main_category || "Inne") !== mainCat));
-  };
+  // unused removeMainCategory
 
-  const removeSubCategory = (mainCat, subCat, e) => {
+  const removeSubCategory = (mainCat: string, subCat: string, e: React.MouseEvent) => {
     e.stopPropagation();
     onChange(data.filter(s => !((s.main_category || "Inne") === mainCat && (s.subcategory || "Ogólne") === subCat)));
   };
 
   const groupedSkills = React.useMemo(() => {
-    const groups = {};
+    const groups: Record<string, Record<string, Skill[]>> = {};
     data.forEach(skill => {
       const main = skill.main_category || "Inne";
       const sub = skill.subcategory || "Ogólne";
@@ -769,7 +782,7 @@ function StepSkillsCombined({ data, onChange }) {
   );
 }
 
-function StepLanguages({ data, onChange }) {
+function StepLanguages({ data, onChange }: { data: LangType[], onChange: (d: LangType[]) => void }) {
   const [showForm, setShowForm] = useState(false);
   const [langName, setLangName] = useState("");
   const [customLang, setCustomLang] = useState("");
@@ -789,7 +802,7 @@ function StepLanguages({ data, onChange }) {
     }
   };
 
-  const remove = (index) => onChange(data.filter((_, i) => i !== index));
+  const remove = (index: number) => onChange(data.filter((_, i) => i !== index));
 
   return (
     <>
@@ -845,7 +858,7 @@ function StepLanguages({ data, onChange }) {
 }
 
 
-function ExperienceItem({ job, onChangeItem, onRemove }) {
+function ExperienceItem({ job, onChangeItem, onRemove }: { job: ExpType, onChangeItem: (j: ExpType) => void, onRemove: () => void }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -907,7 +920,7 @@ function ExperienceItem({ job, onChangeItem, onRemove }) {
   );
 }
 
-function EducationItem({ edu, onChangeItem, onRemove }) {
+function EducationItem({ edu, onChangeItem, onRemove }: { edu: EduType, onChangeItem: (e: EduType) => void, onRemove: () => void }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -967,10 +980,10 @@ function EducationItem({ edu, onChangeItem, onRemove }) {
   );
 }
 
-function LanguageItem({ lang, onChangeItem, onRemove }) {
+function LanguageItem({ lang, onChangeItem, onRemove }: { lang: LangType, onChangeItem: (l: LangType) => void, onRemove: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2", "Native"];
-  const COMMON_LANGUAGES = ["", "Angielski", "Niemiecki", "Hiszpański", "Francuski", "Włoski", "Rosyjski", "Chiński", "Polski", "Inny"];
+  // common languages
 
   return (
     <div style={{ padding: "1rem 1.25rem", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "12px", transition: "all 0.2s ease", borderColor: expanded ? "var(--accent)" : "var(--border)", boxShadow: expanded ? "0 4px 16px rgba(26,95,214,0.06)" : "0 2px 8px rgba(15,28,52,0.02)" }}>
@@ -1018,12 +1031,12 @@ function LanguageItem({ lang, onChangeItem, onRemove }) {
     </div>
   );
 }
-export default function UserProfileWizard({ onComplete, onCancel }) {
+export default function UserProfileWizard({ onComplete, onCancel }: { onComplete: (d: UserProfile) => void, onCancel?: () => void }) {
   const [step, setStep] = useState(0);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState({
+  const [profile, setProfile] = useState<UserProfile>({
     education: [],
     experience: [],
     interested_industries: [],
@@ -1059,7 +1072,7 @@ export default function UserProfileWizard({ onComplete, onCancel }) {
       await api.saveProfile(profile);
       onComplete(profile);
     } catch (err) {
-      setError(err.message);
+      setError((err as Error).message);
     } finally {
       setSaving(false);
     }
@@ -1109,7 +1122,7 @@ export default function UserProfileWizard({ onComplete, onCancel }) {
         step={step}
         totalSteps={STEPS.length}
         title={currentStepData[step].title}
-        subtitle={currentStepData[step].subtitle}
+        subtitle={(currentStepData[step] as any).subtitle}
         onNext={nextStep}
         onPrev={prevStep}
         onSave={saveProfile}

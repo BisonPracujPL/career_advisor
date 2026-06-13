@@ -1,17 +1,19 @@
+import { Filters } from "./types";
+
 const API = import.meta.env.VITE_API_URL || "";
 
-async function request(path, options = {}) {
-  let res;
+async function request(path: string, options: RequestInit = {}) {
+  let res: Response;
   const token = localStorage.getItem("auth_token");
-  const headers = { "Content-Type": "application/json", ...options.headers };
+  const headers: Record<string, string> = { "Content-Type": "application/json", ...(options.headers as Record<string, string> || {}) };
   if (token) {
     headers["Authorization"] = `Token ${token}`;
   }
 
   try {
     res = await fetch(`${API}${path}`, {
-      headers,
       ...options,
+      headers,
     });
   } catch {
     throw new Error(
@@ -29,57 +31,57 @@ async function request(path, options = {}) {
 }
 
 export const api = {
-  login: (username, password) =>
+  login: (username: string, password: string): Promise<any> =>
     request("/api/v1/auth/login/", {
       method: "POST",
       body: JSON.stringify({ username, password }),
     }),
-  register: (username, password) =>
+  register: (username: string, password: string): Promise<any> =>
     request("/api/v1/auth/register/", {
       method: "POST",
       body: JSON.stringify({ username, password }),
     }),
-  getProfile: () => request("/api/v1/profile/"),
-  saveProfile: (data) =>
+  getProfile: (): Promise<any> => request("/api/v1/profile/"),
+  saveProfile: (data: any): Promise<any> =>
     request("/api/v1/profile/", {
       method: "POST",
       body: JSON.stringify(data),
     }),
-  marketPillars: () => request("/api/v1/market/pillars/"),
-  pillarSegments: (pillarId) =>
+  marketPillars: (): Promise<any> => request("/api/v1/market/pillars/"),
+  pillarSegments: (pillarId: string): Promise<any> =>
     request(`/api/v1/market/pillars/${encodeURIComponent(pillarId)}/segments/`),
-  filterOptions: () => request("/api/v1/filters/options/"),
-  searchSkills: (q) =>
+  filterOptions: (): Promise<any> => request("/api/v1/filters/options/"),
+  searchSkills: (q: string): Promise<any> =>
     request(`/api/v1/skills/search/?q=${encodeURIComponent(q)}&limit=20`),
-  recommendSkills: (skills) =>
+  recommendSkills: (skills: string[]): Promise<any> =>
     request("/api/v1/skills/recommend/", {
       method: "POST",
       body: JSON.stringify({ skills }),
     }),
-  categories: () => request("/api/v1/skills/categories/"),
-  subcategories: (code) =>
+  categories: (): Promise<any> => request("/api/v1/skills/categories/"),
+  subcategories: (code: string): Promise<any> =>
     request(
       `/api/v1/skills/categories/${encodeURIComponent(code)}/subcategories/`
     ),
-  offerCategories: () => request("/api/v1/offers/categories/"),
-  offerSubcategories: (name) =>
+  offerCategories: (): Promise<any> => request("/api/v1/offers/categories/"),
+  offerSubcategories: (name: string): Promise<any> =>
     request(
       `/api/v1/offers/categories/${encodeURIComponent(name)}/subcategories/`
     ),
-  browseSkills: (mainCode, subCode) => {
+  browseSkills: (mainCode: string, subCode: string): Promise<any> => {
     const p = new URLSearchParams({ limit: "40" });
     if (mainCode) p.set("main_category_code", mainCode);
     if (subCode) p.set("subcategory_code", subCode);
     return request(`/api/v1/skills/browse/?${p}`);
   },
-  searchOffers: (q) =>
+  searchOffers: (q: string): Promise<any> =>
     request(`/api/v1/offers/search/?q=${encodeURIComponent(q)}&limit=12`),
-  matchBySkills: (body) =>
+  matchBySkills: (body: any): Promise<any> =>
     request("/api/v1/match/by-skills/", {
       method: "POST",
       body: JSON.stringify(body),
     }),
-  matchSimilar: (offerId, filters, limit = 20) => {
+  matchSimilar: (offerId: string | number, filters: Partial<Filters>, limit = 20): Promise<any> => {
     const p = new URLSearchParams({ offer_id: String(offerId), limit: String(limit) });
     if (filters.region_name) p.set("region_name", filters.region_name);
     if (filters.market_pillar) p.set("market_pillar", filters.market_pillar);
@@ -87,7 +89,7 @@ export const api = {
       p.set("lead_main_category", filters.lead_main_category);
     if (filters.lead_sub_category)
       p.set("lead_sub_category", filters.lead_sub_category);
-    (filters.position_level_groups || []).forEach((g) =>
+    (filters.position_level_groups || []).forEach((g: string) =>
       p.append("position_level_groups", g)
     );
     return request(`/api/v1/match/similar/?${p}`);

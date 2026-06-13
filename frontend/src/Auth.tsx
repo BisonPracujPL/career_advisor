@@ -1,14 +1,18 @@
 import React, { useState } from "react";
 import { api } from "./api";
 
-export default function Auth({ onAuthSuccess }) {
+interface AuthProps {
+  onAuthSuccess: () => void;
+}
+
+export default function Auth({ onAuthSuccess }: AuthProps) {
   const [isLogin, setIsLogin] = useState(true);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
@@ -22,7 +26,7 @@ export default function Auth({ onAuthSuccess }) {
       localStorage.setItem("auth_token", data.token);
       onAuthSuccess();
     } catch (err) {
-      setError(err.message);
+      setError((err as Error).message);
     } finally {
       setLoading(false);
     }
