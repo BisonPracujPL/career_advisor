@@ -1146,3 +1146,27 @@ body {
   border-color: var(--accent);
   background: var(--accent-soft);
 }
+
+/* ── Auth ── */
+.auth-overlay {
+  width: 100%;
+  max-width: 400px;
+}
+
+.auth-modal {
+  padding: 2.5rem 2rem;
+}
+
+.auth-modal h2 {
+  margin: 0 0 1.5rem;
+  font-size: 1.6rem;
+  text-align: center;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}

@@ -338,11 +338,13 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("auth_token"));
   const [showAuth, setShowAuth] = useState(!localStorage.getItem("auth_token"));
   const [hasProfile, setHasProfile] = useState(false);
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
   const [profileData, setProfileData] = useState(null);
   const [showProfileWizard, setShowProfileWizard] = useState(false);
 
   useEffect(() => {
     if (isLoggedIn) {
+      setIsProfileLoading(true);
       api.getProfile().then((d) => {
         const hasData = !!d.profile_data && Object.keys(d.profile_data).length > 0;
         setHasProfile(hasData);
@@ -353,7 +355,12 @@ export default function App() {
         setIsLoggedIn(false);
         localStorage.removeItem("auth_token");
         setShowAuth(true);
+      }).finally(() => {
+        setIsProfileLoading(false);
       });
+    } else {
+      setHasProfile(false);
+      setIsProfileLoading(false);
     }
   }, [isLoggedIn, showProfileWizard]);
 
@@ -535,6 +542,7 @@ export default function App() {
     setIsLoggedIn(false);
     setHasProfile(false);
     setShowProfileWizard(false);
+    setShowAuth(true);
   };
 
   const navProps = {
@@ -569,21 +577,28 @@ export default function App() {
     );
   }
 
+  if (!isLoggedIn) {
+    return (
+      <>
+        <Navbar {...navProps} />
+        <div className="app" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh' }}>
+          <Auth
+            onAuthSuccess={() => {
+              setShowAuth(false);
+              setIsLoggedIn(true);
+            }}
+          />
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <Navbar {...navProps} />
       <div className="app">
 
-      {showAuth && (
-        <Auth
-          onAuthSuccess={() => {
-            setShowAuth(false);
-            setIsLoggedIn(true);
-          }}
-        />
-      )}
-
-      {isLoggedIn && !hasProfile && (
+      {!isProfileLoading && isLoggedIn && !hasProfile && (
         <div className="alert" style={{ margin: "1rem 2rem", cursor: "pointer" }} onClick={() => setShowProfileWizard(true)}>
           Wypełnij formularz profilowy, abyśmy mogli polecić Ci lepsze oferty pracy. <strong>Kliknij tutaj.</strong>
         </div>

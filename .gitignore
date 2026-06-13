@@ -1,5 +1,9 @@
 .env
 *.csv
+.impeccable/*
+.agents/*
+.gemini/*
+PRODUCT.md
 
 # Python (powstaje przy uruchomieniu Django w kontenerze z volume ./backend:/app)
 __pycache__/
