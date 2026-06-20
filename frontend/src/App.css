@@ -216,7 +216,7 @@ body {
 
 @media (max-width: 900px) {
   .pillar-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   }
 }
 
@@ -1170,3 +1170,113 @@ body {
   flex-direction: column;
   gap: 0.25rem;
 }
+
+/* ── Chat page layout ── */
+.chat-page-outer {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 57px);
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 1.5rem 1.5rem 1rem;
+  box-sizing: border-box;
+}
+
+.chat-page-header {
+  margin-bottom: 1rem;
+  flex-shrink: 0;
+}
+
+.chat-page-header h2 {
+  margin: 0 0 0.2rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.chat-page-header p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.chat-page-body {
+  flex: 1;
+  min-height: 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+}
+
+/* Chatscope integration overrides */
+.chat-page-body .cs-main-container {
+  height: 100%;
+  border: none;
+  border-radius: 0;
+}
+
+.chat-page-body .cs-chat-container {
+  height: 100%;
+}
+
+.chat-page-body .cs-message-input {
+  border-top: 1px solid var(--border);
+}
+
+.chat-page-body .cs-message-input__content-editor-wrapper,
+.chat-page-body .cs-message-input__content-editor {
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 0.925rem;
+}
+
+.chat-page-body .cs-button--send {
+  color: var(--accent);
+}
+
+.chat-page-body .cs-message--incoming .cs-message__content {
+  background-color: var(--accent-soft);
+  color: var(--text);
+  border-radius: 14px 14px 14px 4px;
+}
+
+.chat-page-body .cs-message--outgoing .cs-message__content {
+  background-color: var(--text);
+  color: #ffffff;
+  border-radius: 14px 14px 4px 14px;
+}
+
+/* Markdown inside messages */
+.chat-page-body .cs-message__content p { margin: 0 0 0.5em; }
+.chat-page-body .cs-message__content p:last-child { margin-bottom: 0; }
+.chat-page-body .cs-message__content img {
+  max-width: 100%;
+  border-radius: 6px;
+  margin-top: 0.5rem;
+  display: block;
+}
+.chat-page-body .cs-message__content code {
+  font-size: 0.85em;
+  background: rgba(0,0,0,0.08);
+  padding: 0.1em 0.3em;
+  border-radius: 4px;
+}
+.chat-page-body .cs-message--outgoing .cs-message__content code {
+  background: rgba(255,255,255,0.18);
+}
+.chat-page-body .cs-message__content pre {
+  background: rgba(0,0,0,0.06);
+  border-radius: 6px;
+  padding: 0.75rem;
+  overflow-x: auto;
+  font-size: 0.82em;
+  margin: 0.5em 0;
+}
+
+@media (max-width: 640px) {
+  .chat-page-outer {
+    padding: 0.5rem 0.5rem 0.25rem;
+    height: calc(100dvh - 57px);
+  }
+}
+

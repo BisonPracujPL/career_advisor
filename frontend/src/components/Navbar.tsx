@@ -4,6 +4,7 @@ import { UserProfile } from '../types';
 export const MODES = [
   { id: "skills", label: "Profil kompetencji", icon: "◆" },
   { id: "job", label: "Podobne stanowisko", icon: "◇" },
+  { id: "chat", label: "Doradca AI", icon: "💬" },
 ];
 
 export interface NavbarProps {

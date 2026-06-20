@@ -1,6 +1,7 @@
 from django.urls import path
 
 from . import views
+from .chat import chat_api
 
 urlpatterns = [
     path("skills/search/", views.SkillSearchView.as_view()),
@@ -29,4 +30,5 @@ urlpatterns = [
     path("auth/register/", views.RegisterView.as_view()),
     path("auth/login/", views.LoginView.as_view()),
     path("profile/", views.UserProfileView.as_view()),
+    path("chat/", chat_api),
 ]

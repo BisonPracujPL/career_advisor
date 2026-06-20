@@ -5,6 +5,7 @@ import UserProfileWizard from "./UserProfileWizard";
 import { Navbar } from "./components/Navbar";
 import { MultiSelect, Collapse, Chip } from "./components/ui";
 import { OfferCard } from "./components/OfferCard";
+import { ChatAdvisor } from "./components/ChatAdvisor";
 import { Filters, Skill, Offer, UserProfile } from "./types";
 
 export default function App() {
@@ -302,329 +303,333 @@ export default function App() {
   return (
     <>
       <Navbar {...navProps} />
-      <div className="app">
 
-      {!isProfileLoading && isLoggedIn && !hasProfile && (
-        <div className="alert" style={{ margin: "1rem 2rem", cursor: "pointer" }} onClick={() => setShowProfileWizard(true)}>
-          Wypełnij formularz profilowy, abyśmy mogli polecić Ci lepsze oferty pracy. <strong>Kliknij tutaj.</strong>
+      {mode === "chat" ? (
+        <div className="chat-page-outer">
+          <ChatAdvisor />
         </div>
-      )}
-
-
-
-      <section className="market-hero panel">
-        <h2 className="market-hero__title">Wybierz obszar rynku</h2>
-        <p className="market-hero__sub">
-          Wybierz obszar, potem zawęź do podkategorii z bazy ofert.
-        </p>
-        <div className="pillar-grid">
-          {pillars.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              className={
-                filters.market_pillar === p.id ? "pillar-card active" : "pillar-card"
-              }
-              onClick={() => selectPillar(p.id)}
-            >
-              <span className="pillar-card__label">{p.label}</span>
-              <span className="pillar-card__desc">{p.description}</span>
-              <span className="pillar-card__count">
-                {p.offer_count.toLocaleString("pl-PL")} ofert
-              </span>
-            </button>
-          ))}
-        </div>
-
-        <div className="filter-row">
-          <label className="field">
-            <span className="field-label">Województwo</span>
-            <select
-              className="input"
-              value={filters.region_name}
-              onChange={(e) =>
-                setFilters((f) => ({ ...f, region_name: e.target.value }))
-              }
-            >
-              <option value="">Cała Polska</option>
-              {(filterOpts?.regions || []).map((r: string) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="field">
-            <MultiSelect
-              label="Poziom stanowiska"
-              placeholder="Dowolny poziom"
-              options={levelGroups}
-              selected={filters.position_level_groups}
-              onChange={(ids) =>
-                setFilters((f) => ({ ...f, position_level_groups: ids }))
-              }
-            />
-          </div>
-        </div>
-
-        {filters.market_pillar && (
-          <div className="segments-block">
-            <div className="segments-head">
-              <span>
-                Podkategorie w: <strong>{activePillar?.label}</strong>
-                {selectedSegmentLabel && (
-                  <>
-                    {" "}
-                    → <em>{selectedSegmentLabel}</em>
-                  </>
-                )}
-              </span>
-              <button
-                type="button"
-                className="link-btn"
-                onClick={() =>
-                  setFilters((f) => ({
-                    ...f,
-                    lead_main_category: "",
-                    lead_sub_category: "",
-                  }))
-                }
-              >
-                Wszystkie w obszarze
-              </button>
+      ) : (
+        <div className="app">
+          {!isProfileLoading && isLoggedIn && !hasProfile && (
+            <div className="alert" style={{ margin: "1rem 2rem", cursor: "pointer" }} onClick={() => setShowProfileWizard(true)}>
+              Wypełnij formularz profilowy, abyśmy mogli polecić Ci lepsze oferty pracy. <strong>Kliknij tutaj.</strong>
             </div>
-            {segmentsLoading ? (
-              <p className="muted">Ładuję podkategorie…</p>
-            ) : (
-              <div className="segment-chips">
-                {segments.map((seg) => {
-                  const active =
-                    seg.lead_main_category === filters.lead_main_category &&
-                    seg.lead_sub_category === filters.lead_sub_category;
-                  return (
-                    <button
-                      key={`${seg.lead_main_category}|${seg.lead_sub_category}`}
-                      type="button"
-                      className={active ? "segment-chip active" : "segment-chip"}
-                      onClick={() => selectSegment(seg)}
-                      title={seg.group_label}
-                    >
-                      {seg.label}
-                      <span className="segment-chip__n">{seg.offer_count}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-      </section>
+          )}
 
-      <div className="workspace">
-        <aside className="panel panel-side">
-          <Collapse title="Branża — pełna lista z bazy" defaultOpen={false}>
-            <label className="field">
-              <span className="field-label">Konkretna branża (lead_main)</span>
-              <select
-                className="input"
-                value={filters.lead_main_category}
-                onChange={(e) =>
-                  setFilters((f) => ({
-                    ...f,
-                    lead_main_category: e.target.value,
-                    lead_sub_category: "",
-                  }))
-                }
-              >
-                <option value="">— z podkategorii powyżej lub wszystkie —</option>
-                {(filterOpts?.lead_main_categories || []).map((c: string) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </Collapse>
+          <section className="market-hero panel">
+            <h2 className="market-hero__title">Wybierz obszar rynku</h2>
+            <p className="market-hero__sub">
+              Wybierz obszar, potem zawęź do podkategorii z bazy ofert.
+            </p>
+            <div className="pillar-grid">
+              {pillars.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={
+                    filters.market_pillar === p.id ? "pillar-card active" : "pillar-card"
+                  }
+                  onClick={() => selectPillar(p.id)}
+                >
+                  <span className="pillar-card__label">{p.label}</span>
+                  <span className="pillar-card__desc">{p.description}</span>
+                  <span className="pillar-card__count">
+                    {p.offer_count.toLocaleString("pl-PL")} ofert
+                  </span>
+                </button>
+              ))}
+            </div>
 
-          {mode === "skills" && (
-            <Collapse title="Twój profil kompetencji" defaultOpen>
+            <div className="filter-row">
               <label className="field">
-                <span className="field-label">Szukaj kompetencji</span>
-                <input
-                  type="search"
-                  className="input"
-                  placeholder="np. Python, SQL, Power BI…"
-                  value={skillQuery}
-                  onChange={(e) => setSkillQuery(e.target.value)}
-                />
-              </label>
-              {skillHits.length > 0 && (
-                <ul className="suggest">
-                  {skillHits.map((s) => (
-                    <li key={s.id}>
-                      <button type="button" onClick={() => addSkill(s)}>
-                        <span className="suggest-title">{s.name}</span>
-                        <span className="suggest-sub">
-                          {s.subcategory || s.main_category}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              <Collapse title="Przeglądaj katalog LightCast" defaultOpen={false}>
+                <span className="field-label">Województwo</span>
                 <select
                   className="input"
-                  value={mainCat}
-                  onChange={(e) => setMainCat(e.target.value)}
+                  value={filters.region_name}
+                  onChange={(e) =>
+                    setFilters((f) => ({ ...f, region_name: e.target.value }))
+                  }
                 >
-                  <option value="">Obszar zawodowy…</option>
-                  {categories.map((c) => (
-                    <option key={c.code} value={c.code}>
-                      {c.name}
+                  <option value="">Cała Polska</option>
+                  {(filterOpts?.regions || []).map((r: string) => (
+                    <option key={r} value={r}>
+                      {r}
                     </option>
                   ))}
                 </select>
-                {subCats.length > 0 && (
+              </label>
+              <div className="field">
+                <MultiSelect
+                  label="Poziom stanowiska"
+                  placeholder="Dowolny poziom"
+                  options={levelGroups}
+                  selected={filters.position_level_groups}
+                  onChange={(ids) =>
+                    setFilters((f) => ({ ...f, position_level_groups: ids }))
+                  }
+                />
+              </div>
+            </div>
+
+            {filters.market_pillar && (
+              <div className="segments-block">
+                <div className="segments-head">
+                  <span>
+                    Podkategorie w: <strong>{activePillar?.label}</strong>
+                    {selectedSegmentLabel && (
+                      <>
+                        {" "}
+                        → <em>{selectedSegmentLabel}</em>
+                      </>
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    className="link-btn"
+                    onClick={() =>
+                      setFilters((f) => ({
+                        ...f,
+                        lead_main_category: "",
+                        lead_sub_category: "",
+                      }))
+                    }
+                  >
+                    Wszystkie w obszarze
+                  </button>
+                </div>
+                {segmentsLoading ? (
+                  <p className="muted">Ładuję podkategorie…</p>
+                ) : (
+                  <div className="segment-chips">
+                    {segments.map((seg) => {
+                      const active =
+                        seg.lead_main_category === filters.lead_main_category &&
+                        seg.lead_sub_category === filters.lead_sub_category;
+                      return (
+                        <button
+                          key={`${seg.lead_main_category}|${seg.lead_sub_category}`}
+                          type="button"
+                          className={active ? "segment-chip active" : "segment-chip"}
+                          onClick={() => selectSegment(seg)}
+                          title={seg.group_label}
+                        >
+                          {seg.label}
+                          <span className="segment-chip__n">{seg.offer_count}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+
+          <div className="workspace">
+            <aside className="panel panel-side">
+              <Collapse title="Branża — pełna lista z bazy" defaultOpen={false}>
+                <label className="field">
+                  <span className="field-label">Konkretna branża (lead_main)</span>
                   <select
                     className="input"
-                    value={subCat}
-                    onChange={(e) => setSubCat(e.target.value)}
+                    value={filters.lead_main_category}
+                    onChange={(e) =>
+                      setFilters((f) => ({
+                        ...f,
+                        lead_main_category: e.target.value,
+                        lead_sub_category: "",
+                      }))
+                    }
                   >
-                    <option value="">Specjalizacja…</option>
-                    {subCats.map((c) => (
-                      <option key={c.code} value={c.code}>
-                        {c.name}
+                    <option value="">— z podkategorii powyżej lub wszystkie —</option>
+                    {(filterOpts?.lead_main_categories || []).map((c: string) => (
+                      <option key={c} value={c}>
+                        {c}
                       </option>
                     ))}
                   </select>
-                )}
-                {browseSkills.length > 0 && (
-                  <ul className="browse">
-                    {browseSkills.slice(0, 12).map((s) => (
-                      <li key={s.id}>
-                        <button type="button" onClick={() => addSkill(s)}>
-                          + {s.name}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                </label>
               </Collapse>
 
-              {selectedSkills.length > 0 && (
-                <div className="profile-chips">
-                  {selectedSkills.map((s) => (
-                    <Chip
-                      key={s.id}
-                      label={s.name}
-                      onRemove={() =>
-                        setSelectedSkills((p) => p.filter((x) => x.id !== s.id))
-                      }
+              {mode === "skills" && (
+                <Collapse title="Twój profil kompetencji" defaultOpen>
+                  <label className="field">
+                    <span className="field-label">Szukaj kompetencji</span>
+                    <input
+                      type="search"
+                      className="input"
+                      placeholder="np. Python, SQL, Power BI…"
+                      value={skillQuery}
+                      onChange={(e) => setSkillQuery(e.target.value)}
                     />
-                  ))}
-                </div>
-              )}
+                  </label>
+                  {skillHits.length > 0 && (
+                    <ul className="suggest">
+                      {skillHits.map((s) => (
+                        <li key={s.id}>
+                          <button type="button" onClick={() => addSkill(s)}>
+                            <span className="suggest-title">{s.name}</span>
+                            <span className="suggest-sub">
+                              {s.subcategory || s.main_category}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
 
-              <button
-                type="button"
-                className="btn-primary"
-                disabled={loading || selectedSkills.length === 0}
-                onClick={runSkillMatch}
-              >
-                {loading ? "Szukam dopasowań…" : "Dopasuj oferty pracy"}
-              </button>
-            </Collapse>
-          )}
-
-          {mode === "job" && (
-            <Collapse title="Wzorzec stanowiska" defaultOpen>
-              <label className="field">
-                <span className="field-label">Tytuł oferty</span>
-                <input
-                  type="search"
-                  className="input"
-                  placeholder="np. Analityk danych, .NET Developer…"
-                  value={jobQuery}
-                  onChange={(e) => setJobQuery(e.target.value)}
-                />
-              </label>
-              {jobHits.length > 0 && (
-                <ul className="suggest">
-                  {jobHits.map((o: any) => (
-                    <li key={o.offer_id}>
-                      <button
-                        type="button"
-                        onClick={() => runJobMatch(o.offer_id, o)}
+                  <Collapse title="Przeglądaj katalog LightCast" defaultOpen={false}>
+                    <select
+                      className="input"
+                      value={mainCat}
+                      onChange={(e) => setMainCat(e.target.value)}
+                    >
+                      <option value="">Obszar zawodowy…</option>
+                      {categories.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                    {subCats.length > 0 && (
+                      <select
+                        className="input"
+                        value={subCat}
+                        onChange={(e) => setSubCat(e.target.value)}
                       >
-                        <span className="suggest-title">{o.job_title}</span>
-                        <span className="suggest-sub">
-                          {o.lead_main_category} · {o.skill_count} kompetencji
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+                        <option value="">Specjalizacja…</option>
+                        {subCats.map((c) => (
+                          <option key={c.code} value={c.code}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    {browseSkills.length > 0 && (
+                      <ul className="browse">
+                        {browseSkills.slice(0, 12).map((s) => (
+                          <li key={s.id}>
+                            <button type="button" onClick={() => addSkill(s)}>
+                              + {s.name}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </Collapse>
+
+                  {selectedSkills.length > 0 && (
+                    <div className="profile-chips">
+                      {selectedSkills.map((s) => (
+                        <Chip
+                          key={s.id}
+                          label={s.name}
+                          onRemove={() =>
+                            setSelectedSkills((p) => p.filter((x) => x.id !== s.id))
+                          }
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={loading || selectedSkills.length === 0}
+                    onClick={runSkillMatch}
+                  >
+                    {loading ? "Szukam dopasowań…" : "Dopasuj oferty pracy"}
+                  </button>
+                </Collapse>
               )}
-              {seedOffer && (
-                <div className="seed-badge">
-                  Wzorzec: <strong>{seedOffer.job_title}</strong>
+
+              {mode === "job" && (
+                <Collapse title="Wzorzec stanowiska" defaultOpen>
+                  <label className="field">
+                    <span className="field-label">Tytuł oferty</span>
+                    <input
+                      type="search"
+                      className="input"
+                      placeholder="np. Analityk danych, .NET Developer…"
+                      value={jobQuery}
+                      onChange={(e) => setJobQuery(e.target.value)}
+                    />
+                  </label>
+                  {jobHits.length > 0 && (
+                    <ul className="suggest">
+                      {jobHits.map((o: any) => (
+                        <li key={o.offer_id}>
+                          <button
+                            type="button"
+                            onClick={() => runJobMatch(o.offer_id, o)}
+                          >
+                            <span className="suggest-title">{o.job_title}</span>
+                            <span className="suggest-sub">
+                              {o.lead_main_category} · {o.skill_count} kompetencji
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {seedOffer && (
+                    <div className="seed-badge">
+                      Wzorzec: <strong>{seedOffer.job_title}</strong>
+                    </div>
+                  )}
+                </Collapse>
+              )}
+            </aside>
+
+            <main className="panel panel-main">
+              <div className="results-head">
+                <div>
+                  <h2>Rekomendowane oferty</h2>
+                  {resultMeta?.count > 0 && mode === "skills" && (
+                    <p className="results-sub muted">
+                      Posortowane wg cosine na wektorach TF-IDF (rzadsze skille ważą
+                      więcej). Pierścień = dopasowanie, pasek = pokrycie wymagań oferty.
+                    </p>
+                  )}
+                </div>
+                {resultMeta?.count > 0 && (
+                  <span className="badge-count">{resultMeta.count} wyników</span>
+                )}
+              </div>
+
+              {error && (
+                <div className="alert" role="alert">
+                  {error}
                 </div>
               )}
-            </Collapse>
-          )}
-        </aside>
 
-        <main className="panel panel-main">
-          <div className="results-head">
-            <div>
-              <h2>Rekomendowane oferty</h2>
-              {resultMeta?.count > 0 && mode === "skills" && (
-                <p className="results-sub muted">
-                  Posortowane wg cosine na wektorach TF-IDF (rzadsze skille ważą
-                  więcej). Pierścień = dopasowanie, pasek = pokrycie wymagań oferty.
-                </p>
+              {loading && (
+                <div className="loading">
+                  <div className="spinner" />
+                  <p>Przeszukuję bazę ofert…</p>
+                </div>
               )}
-            </div>
-            {resultMeta?.count > 0 && (
-              <span className="badge-count">{resultMeta.count} wyników</span>
-            )}
+
+              {!loading && offers.length === 0 && !error && (
+                <div className="empty">
+                  <div className="empty-icon">◎</div>
+                  <h3>Zacznij od profilu lub wzorca</h3>
+                  <p>
+                    {mode === "skills"
+                      ? "Wybierz kompetencje i kliknij „Dopasuj oferty pracy”."
+                      : "Wyszukaj tytuł stanowiska i wybierz ofertę z listy."}
+                  </p>
+                </div>
+              )}
+
+              <div className="offers-grid">
+                {offers.map((o: any) => (
+                  <OfferCard key={o.offer_id} offer={o} />
+                ))}
+              </div>
+            </main>
           </div>
-
-          {error && (
-            <div className="alert" role="alert">
-              {error}
-            </div>
-          )}
-
-          {loading && (
-            <div className="loading">
-              <div className="spinner" />
-              <p>Przeszukuję bazę ofert…</p>
-            </div>
-          )}
-
-          {!loading && offers.length === 0 && !error && (
-            <div className="empty">
-              <div className="empty-icon">◎</div>
-              <h3>Zacznij od profilu lub wzorca</h3>
-              <p>
-                {mode === "skills"
-                  ? "Wybierz kompetencje i kliknij „Dopasuj oferty pracy”."
-                  : "Wyszukaj tytuł stanowiska i wybierz ofertę z listy."}
-              </p>
-            </div>
-          )}
-
-          <div className="offers-grid">
-            {offers.map((o: any) => (
-              <OfferCard key={o.offer_id} offer={o} />
-            ))}
-          </div>
-        </main>
-      </div>
-    </div>
+        </div>
+      )}
     </>
   );
 }
