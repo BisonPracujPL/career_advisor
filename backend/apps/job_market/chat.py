@@ -47,10 +47,19 @@ async def _call_mcp_tool(tool_name: str, arguments: dict) -> str:
             result = await session.call_tool(tool_name, arguments=arguments)
             return result.content[0].text if result.content else ""
 
+from rest_framework.authentication import TokenAuthentication
+
 @csrf_exempt
 def chat_api(request):
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
+
+    try:
+        auth_tuple = TokenAuthentication().authenticate(request)
+        if auth_tuple:
+            request.user = auth_tuple[0]
+    except Exception:
+        pass
 
     try:
         body = json.loads(request.body)
@@ -68,7 +77,8 @@ def chat_api(request):
         "content": (
             "You are a personalized AI career advisor. Respond in Polish. "
             "Be concise, practical, and encouraging. "
-            f"User profile: {json.dumps(profile_data, ensure_ascii=False)}. "
+            f"Here is the detailed user profile data (in JSON format): {json.dumps(profile_data, ensure_ascii=False)}. "
+            "You must use this profile information whenever the user asks about themselves, their background, skills, or what you know about them. "
             "Give specific, actionable career advice based on their profile. "
             "Use markdown for structure (bullet points, bold text). "
             "When the user asks for a chart or visualization, use the available chart tools. "
