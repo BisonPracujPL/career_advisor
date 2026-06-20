@@ -8,8 +8,8 @@ from mcp.client.stdio import stdio_client, StdioServerParameters
 from mcp.client.session import ClientSession
 
 SERVER_PARAMS = StdioServerParameters(
-    command="npx",
-    args=["-y", "@antv/mcp-server-chart"]
+    command="mcp-server-chart",
+    args=[]
 )
 
 def get_user_profile_sync(user):
