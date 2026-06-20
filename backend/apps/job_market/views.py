@@ -475,3 +475,33 @@ class SkillRecommendView(APIView):
             for s in recommended
         ]
         return Response({"results": data})
+
+
+class ChatSuggestionsView(APIView):
+    """
+    Analyzes chat history and returns the top 4 recommended helper prompts.
+    """
+    def post(self, request):
+        messages = request.data.get("messages", [])
+        
+        # Take the last 3 messages to understand the recent context
+        recent_messages = messages[-3:] if len(messages) >= 3 else messages
+        
+        # Combine text of recent messages
+        context_text = " ".join([m.get("content", "") for m in recent_messages if isinstance(m, dict)])
+        
+        from apps.job_market.prompt_suggester import get_top_k_prompts, fill_prompt_variables_with_llm
+        # embedding_model is available globally in views.py
+        top_prompts = get_top_k_prompts(context_text, embedding_model, k=4)
+        
+        profile_data = {}
+        if request.user and request.user.is_authenticated:
+            try:
+                profile = getattr(request.user, "profile", None)
+                profile_data = profile.profile_data if profile else {}
+            except Exception:
+                pass
+                
+        filled_prompts = fill_prompt_variables_with_llm(top_prompts, profile_data, recent_messages)
+        
+        return Response({"suggestions": filled_prompts})

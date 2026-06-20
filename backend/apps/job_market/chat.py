@@ -12,6 +12,8 @@ SERVER_PARAMS = StdioServerParameters(
     args=[]
 )
 
+AI_MODEL = "qwen/qwen3.6-flash"
+
 def get_user_profile_sync(user):
     if not user.is_authenticated:
         return {}
@@ -111,7 +113,7 @@ def chat_api(request):
 
         try:
             first_call_kwargs = {
-                "model": "openai/gpt-4o-mini",
+                "model": AI_MODEL,
                 "messages": full_messages,
                 "max_tokens": 1500,
             }
@@ -169,7 +171,7 @@ def chat_api(request):
                     yield f'0:{json.dumps(chart_str, ensure_ascii=False)}\n'
 
                 stream = client.chat.completions.create(
-                    model="openai/gpt-4o-mini",
+                    model=AI_MODEL,
                     messages=tool_messages,
                     stream=True,
                     max_tokens=1500,
@@ -183,7 +185,7 @@ def chat_api(request):
 
             else:
                 stream = client.chat.completions.create(
-                    model="openai/gpt-4o-mini",
+                    model=AI_MODEL,
                     messages=full_messages,
                     stream=True,
                     max_tokens=1500,

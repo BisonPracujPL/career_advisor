@@ -1461,3 +1461,72 @@ body {
   border-radius: 8px;
   border: 1px solid #fecaca;
 }
+
+.chat-suggestions-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  padding: 0 0.5rem;
+}
+
+.chat-suggestion-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(15, 28, 52, 0.03);
+  transition: all 0.15s ease;
+}
+
+.chat-suggestion-chip:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(26, 95, 214, 0.08);
+}
+
+.chat-suggestion-chip svg {
+  color: var(--accent);
+  opacity: 0.8;
+}
+
+.chat-suggestion-chip:hover svg {
+  opacity: 1;
+}
+
+/* User quick action sent bubble styling */
+.chat-message-row.user .chat-message-content.quick-action-bubble {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.user-quick-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: #ffffff;
+  color: var(--accent);
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: 2px solid var(--accent);
+  box-shadow: 0 4px 16px var(--accent-glow);
+}
+
+.user-quick-action svg {
+  color: var(--accent);
+  opacity: 1;
+}

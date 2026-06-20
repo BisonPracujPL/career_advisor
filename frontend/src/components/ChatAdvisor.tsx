@@ -6,13 +6,47 @@ interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  displayContent?: string;
+  icon?: string;
+  isQuickAction?: boolean;
 }
+
+interface Suggestion {
+  id: string;
+  short_desc: string;
+  prompt: string;
+  icon: string;
+}
+
+const SuggestionIcon = ({ name }: { name: string }) => {
+  switch (name) {
+    case 'bar-chart':
+      return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="20" x2="12" y2="10"></line><line x1="18" y1="20" x2="18" y2="4"></line><line x1="6" y1="20" x2="6" y2="16"></line></svg>;
+    case 'pie-chart':
+      return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>;
+    case 'target':
+      return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>;
+    case 'message-circle':
+      return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>;
+    case 'file-text':
+      return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>;
+    case 'git-commit':
+      return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><line x1="3" y1="12" x2="9" y2="12"></line><line x1="15" y1="12" x2="21" y2="12"></line></svg>;
+    case 'trending-up':
+      return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>;
+    case 'columns':
+      return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7m0-18H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7m0-18v18"></path></svg>;
+    default:
+      return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>;
+  }
+};
 
 export function ChatAdvisor() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -24,6 +58,31 @@ export function ChatAdvisor() {
     scrollToBottom();
   }, [messages, isLoading]);
 
+  const fetchSuggestions = useCallback(async (currentMessages: ChatMessage[]) => {
+    try {
+      const res = await fetch('/api/v1/chat/suggestions/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Token ${localStorage.getItem('auth_token') || ''}`,
+        },
+        body: JSON.stringify({ messages: currentMessages }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSuggestions(data.suggestions || []);
+      }
+    } catch (e) {
+      console.error("Failed to fetch suggestions", e);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isLoading) {
+      fetchSuggestions(messages);
+    }
+  }, [isLoading, messages, fetchSuggestions]);
+
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -31,12 +90,19 @@ export function ChatAdvisor() {
     }
   }, [inputValue]);
 
-  const sendMessage = useCallback(async (text: string) => {
+  const sendMessage = useCallback(async (text: string, displayContent?: string, icon?: string) => {
     const trimmed = text.trim();
     if (!trimmed || isLoading) return;
 
     setError(null);
-    const userMsg: ChatMessage = { id: `u-${Date.now()}`, role: 'user', content: trimmed };
+    const userMsg: ChatMessage = { 
+      id: `u-${Date.now()}`, 
+      role: 'user', 
+      content: trimmed, 
+      displayContent,
+      icon,
+      isQuickAction: !!displayContent
+    };
     const assistantId = `a-${Date.now()}`;
 
     setMessages(prev => [
@@ -105,6 +171,10 @@ export function ChatAdvisor() {
     }
   };
 
+  const handleSuggestionClick = (suggestion: Suggestion) => {
+    sendMessage(suggestion.prompt, suggestion.short_desc, suggestion.icon);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -121,17 +191,17 @@ export function ChatAdvisor() {
              <p>Zadaj pytanie, a AI przeanalizuje Twój profil i doradzi następny krok w karierze.</p>
           </div>
           <div className="chat-welcome-suggestions">
-            <button className="chat-suggestion-btn" onClick={() => setInputValue("Jakie są trendy na rynku IT w 2026?")}>
-              <span>Jakie są trendy na rynku IT w 2026?</span>
+            <button className="chat-suggestion-btn" onClick={() => sendMessage("Jakie są trendy na rynku pracownika w 2026?", "Jakie są trendy na rynku pracownika w 2026?", "trending-up")}>
+              <span>Jakie są trendy na rynku pracownika w 2026?</span>
             </button>
-            <button className="chat-suggestion-btn" onClick={() => setInputValue("Pomóż mi przygotować się do rozmowy o pracę")}>
+            <button className="chat-suggestion-btn" onClick={() => sendMessage("Pomóż mi przygotować się do rozmowy o pracę", "Pomóż mi przygotować się do rozmowy o pracę", "message-circle")}>
               <span>Pomóż mi przygotować się do rozmowy o pracę</span>
             </button>
-            <button className="chat-suggestion-btn" onClick={() => setInputValue("Przeanalizuj moje CV i doradź mi")}>
+            <button className="chat-suggestion-btn" onClick={() => sendMessage("Przeanalizuj moje CV i doradź mi", "Przeanalizuj moje CV i doradź mi", "file-text")}>
               <span>Przeanalizuj moje CV i doradź mi</span>
             </button>
-            <button className="chat-suggestion-btn" onClick={() => setInputValue("Jakie umiejętności powinnam rozwijać?")}>
-              <span>Jakie umiejętności powinnam rozwijać?</span>
+            <button className="chat-suggestion-btn" onClick={() => sendMessage("Jakie umiejętności warto rozwijać?", "Jakie umiejętności warto rozwijać?", "target")}>
+              <span>Jakie umiejętności warto rozwijać?</span>
             </button>
           </div>
         </div>
@@ -159,7 +229,7 @@ export function ChatAdvisor() {
                     </div>
                   )}
                 </div>
-                <div className="chat-message-content">
+                <div className={`chat-message-content ${m.isQuickAction ? 'quick-action-bubble' : ''}`}>
                   {m.role === 'assistant' ? (
                     !m.content && isLoading ? (
                       <div className="typing-indicator">
@@ -175,7 +245,14 @@ export function ChatAdvisor() {
                       </div>
                     )
                   ) : (
-                    <div className="user-text">{m.content}</div>
+                    m.isQuickAction ? (
+                      <div className="user-quick-action">
+                        {m.icon && <SuggestionIcon name={m.icon} />}
+                        <span>{m.displayContent}</span>
+                      </div>
+                    ) : (
+                      <div className="user-text">{m.content}</div>
+                    )
                   )}
                 </div>
               </div>
@@ -193,6 +270,21 @@ export function ChatAdvisor() {
       )}
 
       <div className="chat-input-area">
+        {suggestions.length > 0 && !isLoading && (
+          <div className="chat-suggestions-container">
+            {suggestions.map((s) => (
+              <button
+                key={s.id}
+                className="chat-suggestion-chip"
+                onClick={() => handleSuggestionClick(s)}
+                title={s.prompt}
+              >
+                <SuggestionIcon name={s.icon} />
+                <span>{s.short_desc}</span>
+              </button>
+            ))}
+          </div>
+        )}
         <div className="chat-input-wrapper">
           <textarea
             ref={textareaRef}

@@ -31,4 +31,5 @@ urlpatterns = [
     path("auth/login/", views.LoginView.as_view()),
     path("profile/", views.UserProfileView.as_view()),
     path("chat/", chat_api),
+    path("chat/suggestions/", views.ChatSuggestionsView.as_view()),
 ]

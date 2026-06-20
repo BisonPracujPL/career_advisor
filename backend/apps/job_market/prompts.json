@@ -1,0 +1,32 @@
+[
+  {
+    "id": "salary_trend_sector",
+    "short_desc": "Trend zarobków: [Branża]",
+    "prompt": "Jako doradca zawodowy, użyj narzędzia AntV MCP, aby wygenerować wykres liniowy (Line Chart) pokazujący trend średnich zarobków w branży [Branża] na przestrzeni ostatnich 5 lat. Samodzielnie oszacuj realistyczne dane liczbowe w PLN. Pod wykresem napisz jedno zdanie z prognozą na kolejny rok.",
+    "icon": "trending-up"
+  },
+  {
+    "id": "salary_trend_role",
+    "short_desc": "Zarobki wg doświadczenia: [Stanowisko]",
+    "prompt": "Użyj narzędzia AntV MCP, aby wygenerować wykres słupkowy (Bar Chart) porównujący średnie wynagrodzenia na stanowisku [Stanowisko]. Na osi X umieść poziomy doświadczenia: Junior, Mid, Senior. Na osi Y wartości w PLN (oszacuj realistyczne rynkowe stawki). Pod wykresem napisz krótko, ile lat średnio zajmuje przejście między tymi szczeblami.",
+    "icon": "bar-chart-2"
+  },
+  {
+    "id": "skill_gap",
+    "short_desc": "Analiza moich luk: [Stanowisko]",
+    "prompt": "Zróbmy analizę moich kompetencji na stanowisku [Stanowisko]. Użyj narzędzia AntV MCP do wygenerowania wykresu radarowego (Radar Chart). Wykres ma porównywać dwie serie danych: 'Wymagania rynkowe' oraz 'Mój obecny poziom' w 5 najważniejszych dla tej roli kompetencjach. Na potrzeby wykresu oszacuj moje umiejętności losowo w skali 1-10. Pod spodem wskaż jedną umiejętność do najpilniejszej poprawy.",
+    "icon": "target"
+  },
+  {
+    "id": "role_comparison",
+    "short_desc": "Porównanie: [Rola A] vs [Rola B]",
+    "prompt": "Porównaj stanowiska [Rola A] i [Rola B]. Użyj narzędzia AntV MCP, aby stworzyć pogrupowany wykres słupkowy (Grouped Bar Chart). Osie X to cztery kategorie oceniane w skali 1-100: 'Początkowe zarobki', 'Zapotrzebowanie na rynku', 'Próg wejścia (trudność)' i 'Work-life balance'. Wygeneruj znormalizowane dane dla obu ról. Dodaj krótkie podsumowanie dla niezdecydowanych.",
+    "icon": "columns"
+  },
+  {
+    "id": "demand_chart",
+    "short_desc": "Top 5 skilli na [Stanowisko]",
+    "prompt": "Użyj narzędzia AntV MCP, aby wygenerować wykres kołowy (Pie Chart) pokazujący udział 5 najpopularniejszych narzędzi/technologii wymaganych w obecnych ofertach pracy dla [Stanowisko]. Przygotuj realistyczne dane procentowe sumujące się do 100%. Podsumuj w jednym zdaniu, z czego warto zrobić pierwszy certyfikat.",
+    "icon": "pie-chart"
+  }
+]
