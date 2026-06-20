@@ -305,9 +305,7 @@ export default function App() {
       <Navbar {...navProps} />
 
       {mode === "chat" ? (
-        <div className="chat-page-outer">
-          <ChatAdvisor />
-        </div>
+        <ChatAdvisor />
       ) : (
         <div className="app">
           {!isProfileLoading && isLoggedIn && !hasProfile && (
