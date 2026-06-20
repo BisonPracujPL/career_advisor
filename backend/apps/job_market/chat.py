@@ -12,7 +12,7 @@ SERVER_PARAMS = StdioServerParameters(
     args=[]
 )
 
-AI_MODEL = "qwen/qwen3.6-flash"
+AI_MODEL = "openai/gpt-4o-mini"
 
 def get_user_profile_sync(user):
     if not user.is_authenticated:
