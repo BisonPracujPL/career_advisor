@@ -42,6 +42,34 @@ def _industry_filter_q(industries: list | None) -> Q:
     return q
 
 
+def top_segment_without_skills(industries: list | None = None) -> dict | None:
+    base = JobOffer.objects.exclude(lead_sub_category="")
+    iq = _industry_filter_q(industries)
+    if iq:
+        base = base.filter(iq)
+    row = (
+        base.values("lead_main_category", "lead_sub_category")
+        .annotate(offer_count=Count("id"))
+        .filter(offer_count__gte=MIN_SEGMENT_SIZE)
+        .order_by("-offer_count")
+        .first()
+    )
+    if not row:
+        return None
+    return {
+        "lead_main_category": row["lead_main_category"],
+        "lead_sub_category": row["lead_sub_category"],
+        "display_label": segment_display_label(
+            row["lead_main_category"], row["lead_sub_category"]
+        ),
+        "offer_count": row["offer_count"],
+        "match_pct": 0,
+        "skill_coverage_pct": 0,
+        "top_missing_skills": [],
+        "median_salary_uop": None,
+    }
+
+
 def rank_segments_for_profile(
     skill_ids: list[str],
     industries: list | None = None,

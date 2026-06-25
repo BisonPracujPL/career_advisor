@@ -10,8 +10,8 @@ from apps.job_market.services.segment_analytics import (
     _top_skills_in_segment,
 )
 from apps.job_market.services.segment_ranking import (
-    _top_segment_without_skills,
     rank_segments_for_profile,
+    top_segment_without_skills,
 )
 
 MAX_BRANCHES = 5
@@ -35,7 +35,7 @@ def _generate_branches(skill_ids: list[str], industries: list | None) -> list[di
     """Pick up to MAX_BRANCHES skills that most improve TF-IDF match to distinct segments."""
     ranked = rank_segments_for_profile(skill_ids, industries, limit=MAX_HISTORY_SEGMENTS)
     if not ranked and not skill_ids:
-        fallback = _top_segment_without_skills(industries)
+        fallback = top_segment_without_skills(industries)
         if fallback:
             ranked = [fallback]
 
@@ -113,7 +113,7 @@ def _state_node(
 ) -> dict:
     ranked = rank_segments_for_profile(skill_ids, industries, limit=3) if skill_ids else []
     if not ranked:
-        fallback = _top_segment_without_skills(industries)
+        fallback = top_segment_without_skills(industries)
         if fallback:
             ranked = [fallback]
 
