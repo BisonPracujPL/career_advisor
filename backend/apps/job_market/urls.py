@@ -27,6 +27,9 @@ urlpatterns = [
     path("market/career-roadmap/", views.CareerRoadmapView.as_view()),
     path("market/career-roadmap/insights/", views.CareerSegmentInsightsView.as_view()),
     path(
+        "market/career-roadmap/branch-vision/",
+        views.CareerBranchVisionView.as_view(),
+    ),
     path("offers/categories/", views.OfferCategoriesView.as_view()),
     path(
         "offers/categories/<str:main_cat>/subcategories/",

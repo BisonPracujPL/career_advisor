@@ -150,4 +150,13 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ segments }),
     }),
+  getCareerBranchVision: (payload: {
+    branch: Record<string, unknown>;
+    profile_override?: Record<string, unknown>;
+    segment_insight?: Record<string, unknown>;
+  }): Promise<{ content: string; error?: string | null }> =>
+    request("/api/v1/market/career-roadmap/branch-vision/", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 };

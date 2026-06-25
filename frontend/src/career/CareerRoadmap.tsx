@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { Chip } from "../components/ui";
+import { BranchVisionPanel } from "./BranchVisionPanel";
 import { CareerOptionMatrix } from "./CareerOptionMatrix";
 import {
   CareerTree,
@@ -9,6 +10,7 @@ import {
   TreeNode,
   TreeSegmentSummary,
   TreeStateNode,
+  UserProfile,
   segmentInsightKey,
 } from "../types";
 
@@ -347,12 +349,14 @@ function BranchDetail({
   insight,
   insightsLoading,
   takingBranch,
+  profileForVision,
   onTakeBranch,
 }: {
   branch: TreeBranchNode;
   insight?: SegmentInsight;
   insightsLoading?: boolean;
   takingBranch?: boolean;
+  profileForVision: UserProfile;
   onTakeBranch: (branch: TreeBranchNode) => void;
 }) {
   const isBundle = branch.branch_type === "bundle" || (branch.skills?.length ?? 0) > 1;
@@ -405,6 +409,11 @@ function BranchDetail({
         insight={insight ?? branch.segment_insight}
       />
 
+      <BranchVisionPanel
+        branch={branch}
+        profileForVision={profileForVision}
+        insight={insight ?? branch.segment_insight}
+      />
 
       {branch.status === "available" && (
         <button
@@ -524,6 +533,7 @@ export function CareerTreePanel({
   segmentInsights,
   insightsLoading,
   takingBranch,
+  profileForVision,
   onTakeBranch,
 }: {
   data: CareerTree;
@@ -531,6 +541,7 @@ export function CareerTreePanel({
   segmentInsights: Record<string, SegmentInsight>;
   insightsLoading?: boolean;
   takingBranch?: boolean;
+  profileForVision: UserProfile;
   onTakeBranch: (branch: TreeBranchNode) => void;
 }) {
   const active =
@@ -573,6 +584,7 @@ export function CareerTreePanel({
           insight={branchInsight}
           insightsLoading={insightsLoading}
           takingBranch={takingBranch}
+          profileForVision={profileForVision}
           onTakeBranch={onTakeBranch}
         />
       )}

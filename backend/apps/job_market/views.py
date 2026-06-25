@@ -659,3 +659,27 @@ class CareerSegmentInsightsView(APIView):
         if not segments:
             return Response({"insights": {}})
         return Response({"insights": batch_segment_insights(segments)})
+
+
+class CareerBranchVisionView(APIView):
+    """One-shot AI vision + course links for a career tree branch (not the main chat)."""
+
+    def post(self, request):
+        from apps.job_market.services.career_branch_vision import generate_branch_vision
+
+        branch = request.data.get("branch")
+        if not branch or not isinstance(branch, dict):
+            return Response(
+                {"error": "branch (object) is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        profile_data = request.data.get("profile_override")
+        if profile_data is None and request.user.is_authenticated:
+            profile_data = request.user.profile_data or {}
+
+        segment_insight = request.data.get("segment_insight")
+        result = generate_branch_vision(branch, profile_data, segment_insight)
+        if result.get("error") and not result.get("content"):
+            return Response(result, status=status.HTTP_502_BAD_GATEWAY)
+        return Response(result)

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { CareerTrajectorySummary } from "./CareerCompareCharts";
 import {
@@ -115,6 +115,25 @@ export function CareerPathView({
   const activeIndustries = isVirtual
     ? virtualProfile.interested_industries || []
     : profileData?.interested_industries || [];
+
+  const profileForVision = useMemo(
+    (): UserProfile => ({
+      hard_skills: activeSkills,
+      experience: activeExperience,
+      career_path: activeCareerPath,
+      interested_industries: activeIndustries,
+      education: profileData?.education || [],
+      languages: profileData?.languages || [],
+    }),
+    [
+      activeSkills,
+      activeExperience,
+      activeCareerPath,
+      activeIndustries,
+      profileData?.education,
+      profileData?.languages,
+    ]
+  );
 
   const skillIds = activeSkills
     .map((s) => String(s.id))
@@ -435,6 +454,7 @@ export function CareerPathView({
               segmentInsights={segmentInsights}
               insightsLoading={insightsLoading}
               takingBranch={takingBranch}
+              profileForVision={profileForVision}
               onTakeBranch={handleTakeBranch}
             />
           </div>

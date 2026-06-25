@@ -3939,3 +3939,137 @@ body {
     flex-direction: column;
   }
 }
+
+/* Branch vision panel — AI card on career path (not main chat) */
+.branch-vision-panel {
+  margin-top: 1.25rem;
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(88, 28, 135, 0.08), rgba(28, 176, 246, 0.06));
+  border: 1px solid rgba(88, 28, 135, 0.22);
+  box-shadow: 0 4px 18px rgba(28, 28, 40, 0.06);
+}
+
+.branch-vision-panel__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.branch-vision-panel__title-wrap {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+}
+
+.branch-vision-panel__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 8px;
+  background: rgba(88, 28, 135, 0.15);
+  color: #7c3aed;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+.branch-vision-panel__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1e1b4b;
+}
+
+.branch-vision-panel__sub {
+  margin: 0.15rem 0 0;
+  font-size: 0.75rem;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+.branch-vision-panel__refresh {
+  border: none;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 8px;
+  width: 2rem;
+  height: 2rem;
+  cursor: pointer;
+  font-size: 1.1rem;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.branch-vision-panel__refresh:hover:not(:disabled) {
+  color: #7c3aed;
+  background: #fff;
+}
+
+.branch-vision-panel__refresh:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.branch-vision-panel__loading {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-size: 0.85rem;
+  color: #64748b;
+  padding: 0.5rem 0;
+}
+
+.branch-vision-panel__error {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #dc2626;
+}
+
+.branch-vision-panel__body {
+  font-size: 0.84rem;
+  line-height: 1.55;
+  color: #334155;
+}
+
+.branch-vision-panel__body h3 {
+  margin: 0.75rem 0 0.35rem;
+  font-size: 0.88rem;
+  color: #1e1b4b;
+}
+
+.branch-vision-panel__body h3:first-child {
+  margin-top: 0;
+}
+
+.branch-vision-panel__body p {
+  margin: 0.35rem 0;
+}
+
+.branch-vision-panel__body ul {
+  margin: 0.35rem 0 0.5rem;
+  padding-left: 1.1rem;
+}
+
+.branch-vision-panel__body li {
+  margin: 0.35rem 0;
+}
+
+.branch-vision-panel__body a {
+  color: #7c3aed;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.branch-vision-panel__body a:hover {
+  text-decoration: underline;
+}
+
+.branch-vision-panel__footnote {
+  margin: 0.75rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
