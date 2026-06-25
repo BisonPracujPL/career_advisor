@@ -221,10 +221,16 @@ export default function App() {
   );
 
   const takeCareerBranch = useCallback(
-    async (skill: Skill, step: CareerPathStep) => {
-      setSelectedSkills((prev) =>
-        prev.some((s) => String(s.id) === String(skill.id)) ? prev : [...prev, skill]
-      );
+    async (skills: Skill[], step: CareerPathStep) => {
+      setSelectedSkills((prev) => {
+        let next = [...prev];
+        for (const skill of skills) {
+          if (!next.some((s) => String(s.id) === String(skill.id))) {
+            next = [...next, skill];
+          }
+        }
+        return next;
+      });
       const base: UserProfile = profileData || {
         experience: [],
         education: [],
@@ -232,14 +238,16 @@ export default function App() {
         languages: [],
         interested_industries: [],
       };
-      const hard_skills = base.hard_skills || [];
-      const nextSkills = hard_skills.some((s) => String(s.id) === String(skill.id))
-        ? hard_skills
-        : [...hard_skills, skill];
+      let hard_skills = [...(base.hard_skills || [])];
+      for (const skill of skills) {
+        if (!hard_skills.some((s) => String(s.id) === String(skill.id))) {
+          hard_skills = [...hard_skills, skill];
+        }
+      }
       const prevSteps = base.career_path?.steps || [];
       const nextProfile: UserProfile = {
         ...base,
-        hard_skills: nextSkills,
+        hard_skills,
         career_path: {
           ...base.career_path,
           steps: [...prevSteps, step],
@@ -604,7 +612,7 @@ export default function App() {
       <Navbar {...navProps} />
 
       {mode === "chat" ? (
-        <ChatAdvisor />
+        <ChatAdvisor profileData={profileData} />
       ) : mode === "path" ? (
         <CareerPathView
           profileData={profileData}
@@ -612,9 +620,6 @@ export default function App() {
           onEditProfile={() => setShowProfileWizard(true)}
           onTakeBranch={takeCareerBranch}
           onResetPath={resetCareerPath}
-          onOpenSegment={(segment, returnMode) =>
-            openSegment(segment, emptySegmentFilters, returnMode)
-          }
         />
       ) : (
         <div className="app">
