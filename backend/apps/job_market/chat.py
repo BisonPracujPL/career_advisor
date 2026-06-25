@@ -7,6 +7,12 @@ from django.views.decorators.csrf import csrf_exempt
 from mcp.client.stdio import stdio_client, StdioServerParameters
 from mcp.client.session import ClientSession
 
+from apps.job_market.services.career_chat_context import (
+    CHAT_COURSE_INSTRUCTIONS,
+    build_chat_career_context,
+    format_chat_context_block,
+)
+
 SERVER_PARAMS = StdioServerParameters(
     command="mcp-server-chart",
     args=[]
@@ -73,18 +79,23 @@ def chat_api(request):
         messages = [{"role": "user", "content": "Hello"}]
 
     profile_data = get_user_profile_sync(request.user)
+    if body.get("profile_override") and isinstance(body["profile_override"], dict):
+        profile_data = {**profile_data, **body["profile_override"]}
+
+    market_ctx = build_chat_career_context(profile_data)
+    context_block = format_chat_context_block(profile_data, market_ctx)
 
     system_prompt = {
         "role": "system",
         "content": (
-            "You are a personalized AI career advisor. Respond in Polish. "
-            "Be concise, practical, and encouraging. "
-            f"Here is the detailed user profile data (in JSON format): {json.dumps(profile_data, ensure_ascii=False)}. "
-            "You must use this profile information whenever the user asks about themselves, their background, skills, or what you know about them. "
-            "Give specific, actionable career advice based on their profile. "
-            "Use markdown for structure (bullet points, bold text). "
-            "When the user asks for a chart or visualization, use the available chart tools. "
-            "After generating a chart, embed the result as a Markdown image so it displays inline."
+            "You are a personalized AI career advisor for the Polish job market. "
+            "Respond in Polish. Be concise, practical, and encouraging.\n\n"
+            f"User profile (JSON): {json.dumps(profile_data, ensure_ascii=False)}\n\n"
+            f"{context_block}\n\n"
+            f"{CHAT_COURSE_INSTRUCTIONS}\n\n"
+            "Use the profile and market context whenever the user asks about themselves, "
+            "skills, career path, courses, or trends. "
+            "When the user asks for a chart, use available chart tools and embed results as Markdown images."
         ),
     }
     full_messages = [system_prompt] + list(messages)

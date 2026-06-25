@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { UserProfile } from '../types';
 
 interface ChatMessage {
   id: string;
@@ -41,7 +42,7 @@ const SuggestionIcon = ({ name }: { name: string }) => {
   }
 };
 
-export function ChatAdvisor() {
+export function ChatAdvisor({ profileData }: { profileData?: UserProfile | null }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -95,13 +96,13 @@ export function ChatAdvisor() {
     if (!trimmed || isLoading) return;
 
     setError(null);
-    const userMsg: ChatMessage = { 
-      id: `u-${Date.now()}`, 
-      role: 'user', 
-      content: trimmed, 
+    const userMsg: ChatMessage = {
+      id: `u-${Date.now()}`,
+      role: 'user',
+      content: trimmed,
       displayContent,
       icon,
-      isQuickAction: !!displayContent
+      isQuickAction: !!displayContent,
     };
     const assistantId = `a-${Date.now()}`;
 
@@ -121,7 +122,10 @@ export function ChatAdvisor() {
           'Content-Type': 'application/json',
           'Authorization': `Token ${localStorage.getItem('auth_token') || ''}`,
         },
-        body: JSON.stringify({ messages: history }),
+        body: JSON.stringify({
+          messages: history,
+          profile_override: profileData || undefined,
+        }),
       });
 
       if (!res.ok) {
@@ -140,11 +144,11 @@ export function ChatAdvisor() {
         for (const line of chunk.split('\n')) {
           if (line.startsWith('0:')) {
             try {
-              const text = JSON.parse(line.slice(2));
+              const textChunk = JSON.parse(line.slice(2));
               setMessages(prev =>
                 prev.map(m =>
                   m.id === assistantId
-                    ? { ...m, content: m.content + text }
+                    ? { ...m, content: m.content + textChunk }
                     : m
                 )
               );
@@ -161,7 +165,7 @@ export function ChatAdvisor() {
     } finally {
       setIsLoading(false);
     }
-  }, [messages, isLoading]);
+  }, [messages, isLoading, profileData]);
 
   const handleSend = () => {
     sendMessage(inputValue);
@@ -182,26 +186,43 @@ export function ChatAdvisor() {
     }
   };
 
+  const skillCount = profileData?.hard_skills?.length ?? 0;
+  const hasProfile = skillCount > 0 || (profileData?.experience?.length ?? 0) > 0;
+
   return (
     <div className="chat-layout">
       {messages.length === 0 ? (
         <div className="chat-welcome">
           <div className="chat-welcome-header">
              <h1>Co mogę dla Ciebie zrobić?</h1>
-             <p>Zadaj pytanie, a AI przeanalizuje Twój profil i doradzi następny krok w karierze.</p>
+             <p>
+               AI zna Twój profil, segmenty rynku i ścieżkę kariery — poleci kursy z linkami,
+               trendy i kolejne kroki rozwoju.
+             </p>
+             {hasProfile ? (
+               <p className="chat-welcome-profile">
+                 Profil aktywny: {skillCount} skilli
+                 {(profileData?.career_path?.steps?.length ?? 0) > 0 &&
+                   ` · ${profileData!.career_path!.steps!.length} kroków ścieżki kariery`}
+               </p>
+             ) : (
+               <p className="chat-welcome-profile chat-welcome-profile--muted">
+                 Uzupełnij profil w aplikacji — doradca dopasuje kursy i trendy do Ciebie.
+               </p>
+             )}
           </div>
           <div className="chat-welcome-suggestions">
-            <button className="chat-suggestion-btn" onClick={() => sendMessage("Jakie są trendy na rynku pracownika w 2026?", "Jakie są trendy na rynku pracownika w 2026?", "trending-up")}>
-              <span>Jakie są trendy na rynku pracownika w 2026?</span>
+            <button className="chat-suggestion-btn" onClick={() => sendMessage("Na podstawie mojego profilu zaproponuj kursy online z linkami do brakujących kompetencji. Podaj platformę, poziom i czas nauki.", "Kursy pod moje braki", "target")}>
+              <span>Kursy pod moje braki (z linkami)</span>
             </button>
-            <button className="chat-suggestion-btn" onClick={() => sendMessage("Pomóż mi przygotować się do rozmowy o pracę", "Pomóż mi przygotować się do rozmowy o pracę", "message-circle")}>
-              <span>Pomóż mi przygotować się do rozmowy o pracę</span>
+            <button className="chat-suggestion-btn" onClick={() => sendMessage("Jakie trendy 2025–2026 są najważniejsze dla kogoś z moim profilem? Co nowego warto się uczyć?", "Trendy dla mojego profilu", "trending-up")}>
+              <span>Trendy dla mojego profilu</span>
             </button>
-            <button className="chat-suggestion-btn" onClick={() => sendMessage("Przeanalizuj moje CV i doradź mi", "Przeanalizuj moje CV i doradź mi", "file-text")}>
-              <span>Przeanalizuj moje CV i doradź mi</span>
+            <button className="chat-suggestion-btn" onClick={() => sendMessage("Przeanalizuj moją ścieżkę kariery i brakujące skille. Ułóż plan nauki z linkami do kursów krok po kroku.", "Plan nauki na ścieżkę kariery", "git-commit")}>
+              <span>Plan nauki na ścieżkę kariery</span>
             </button>
-            <button className="chat-suggestion-btn" onClick={() => sendMessage("Jakie umiejętności warto rozwijać?", "Jakie umiejętności warto rozwijać?", "target")}>
-              <span>Jakie umiejętności warto rozwijać?</span>
+            <button className="chat-suggestion-btn" onClick={() => sendMessage("Przeanalizuj moje CV i doradź mi konkretnie — czego mi brakuje i gdzie to nadrobić?", "Analiza CV i luki", "file-text")}>
+              <span>Analiza CV i luki kompetencyjne</span>
             </button>
           </div>
         </div>
@@ -295,9 +316,9 @@ export function ChatAdvisor() {
             disabled={isLoading}
             rows={1}
           />
-          <button 
-            className="chat-send-btn" 
-            onClick={handleSend} 
+          <button
+            className="chat-send-btn"
+            onClick={handleSend}
             disabled={!inputValue.trim() || isLoading}
             aria-label="Wyślij"
           >

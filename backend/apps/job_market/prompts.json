@@ -1,5 +1,23 @@
 [
   {
+    "id": "course_recommendations",
+    "short_desc": "Kursy pod moje braki",
+    "prompt": "Na podstawie mojego profilu i brakujących kompetencji zaproponuj 3–5 konkretnych kursów online z linkami (Coursera, Udemy, LinkedIn Learning lub polskie platformy). Dla każdego: poziom, czas nauki i dlaczego warto dla mnie.",
+    "icon": "target"
+  },
+  {
+    "id": "trends_personal",
+    "short_desc": "Trendy dla mojego profilu",
+    "prompt": "Jakie trendy na rynku pracy w 2025–2026 są najważniejsze dla kogoś z moim profilem i skillami? Co rosnącego w moich segmentach warto obserwować i czego się uczyć w pierwszej kolejności?",
+    "icon": "trending-up"
+  },
+  {
+    "id": "career_path_courses",
+    "short_desc": "Kursy na ścieżkę kariery",
+    "prompt": "Przeanalizuj moją ścieżkę kariery w aplikacji i brakujące skille. Zaproponuj plan nauki z linkami do kursów krok po kroku — najpierw najpilniejsze kompetencje pod mój docelowy segment.",
+    "icon": "git-commit"
+  },
+  {
     "id": "salary_trend_sector",
     "short_desc": "Trend zarobków: [Branża]",
     "prompt": "Jako doradca zawodowy, użyj narzędzia AntV MCP, aby wygenerować wykres liniowy (Line Chart) pokazujący trend średnich zarobków w branży [Branża] na przestrzeni ostatnich 5 lat. Samodzielnie oszacuj realistyczne dane liczbowe w PLN. Pod wykresem napisz jedno zdanie z prognozą na kolejny rok.",
