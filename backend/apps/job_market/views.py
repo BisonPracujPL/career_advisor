@@ -610,3 +610,39 @@ class SegmentAnalyticsView(APIView):
         if analytics is None:
             return Response({"detail": "Brak ofert w tym segmencie."}, status=status.HTTP_404_NOT_FOUND)
         return Response(analytics)
+
+
+class SegmentRankingView(APIView):
+    """Rank market segments by fit with the user's skill profile."""
+
+    def post(self, request):
+        from apps.job_market.services.segment_ranking import rank_segments_for_profile
+
+        skill_ids = request.data.get("skill_ids") or []
+        if not skill_ids:
+            return Response(
+                {"detail": "Wybierz co najmniej jeden skill."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        limit = min(int(request.data.get("limit", 15)), 30)
+        industries = request.data.get("interested_industries")
+        segments = rank_segments_for_profile(skill_ids, industries, limit)
+        return Response({"segments": segments, "count": len(segments)})
+
+
+class CareerRoadmapView(APIView):
+    """Dynamic TF-IDF skill tree — branches show real match gains toward segments."""
+
+    def post(self, request):
+        from apps.job_market.services.career_tree import build_career_tree
+
+        skill_ids = request.data.get("skill_ids") or []
+        industries = request.data.get("interested_industries")
+        career_path = request.data.get("career_path") or {}
+        tree = build_career_tree(skill_ids, industries, career_path)
+        if tree is None:
+            return Response(
+                {"detail": "Brak danych do wygenerowania ścieżki kariery."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(tree)

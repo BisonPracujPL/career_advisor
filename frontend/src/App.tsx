@@ -8,7 +8,9 @@ import { OfferCard } from "./components/OfferCard";
 import { ChatAdvisor } from "./components/ChatAdvisor";
 import { OfferDetailView } from "./explore/OfferDetailView";
 import { SegmentAnalyticsView } from "./explore/SegmentAnalyticsView";
+import { CareerPathView } from "./career/CareerPathView";
 import {
+  CareerPathStep,
   Filters,
   Skill,
   Offer,
@@ -53,6 +55,7 @@ export default function App() {
 
   const [exploreView, setExploreView] = useState<ExploreView>("results");
   const [exploreBack, setExploreBack] = useState<ExploreView>("results");
+  const [exploreReturnMode, setExploreReturnMode] = useState("skills");
   const [offerDetail, setOfferDetail] = useState<OfferDetail | null>(null);
   const [segmentData, setSegmentData] = useState<SegmentAnalytics | null>(null);
   const [exploreLoading, setExploreLoading] = useState(false);
@@ -168,6 +171,21 @@ export default function App() {
     return () => clearTimeout(t);
   }, [jobQuery]);
 
+  useEffect(() => {
+    if (mode !== "path" || !profileData?.hard_skills?.length) return;
+    setSelectedSkills((prev) => {
+      const fromProfile = profileData.hard_skills.filter((s) => s.id);
+      if (!fromProfile.length) return prev;
+      const merged = [...prev];
+      for (const s of fromProfile) {
+        if (!merged.some((m) => String(m.id) === String(s.id))) {
+          merged.push(s);
+        }
+      }
+      return merged;
+    });
+  }, [mode, profileData]);
+
   const addSkill = useCallback((skill: Skill) => {
     setSelectedSkills((prev) =>
       prev.some((s) => s.id === skill.id) ? prev : [...prev, skill]
@@ -179,6 +197,73 @@ export default function App() {
   const removeSkill = useCallback((skillId: string) => {
     setSelectedSkills((prev) => prev.filter((s) => String(s.id) !== skillId));
   }, []);
+
+  const persistProfileSkill = useCallback(
+    async (skill: Skill) => {
+      setSelectedSkills((prev) =>
+        prev.some((s) => String(s.id) === String(skill.id)) ? prev : [...prev, skill]
+      );
+      const base: UserProfile = profileData || {
+        experience: [],
+        education: [],
+        hard_skills: [],
+        languages: [],
+        interested_industries: [],
+      };
+      const hard_skills = base.hard_skills || [];
+      if (hard_skills.some((s) => String(s.id) === String(skill.id))) return;
+      const next = { ...base, hard_skills: [...hard_skills, skill] };
+      const data = await api.saveProfile(next);
+      setProfileData(data.profile_data);
+      setHasProfile(true);
+    },
+    [profileData]
+  );
+
+  const takeCareerBranch = useCallback(
+    async (skill: Skill, step: CareerPathStep) => {
+      setSelectedSkills((prev) =>
+        prev.some((s) => String(s.id) === String(skill.id)) ? prev : [...prev, skill]
+      );
+      const base: UserProfile = profileData || {
+        experience: [],
+        education: [],
+        hard_skills: [],
+        languages: [],
+        interested_industries: [],
+      };
+      const hard_skills = base.hard_skills || [];
+      const nextSkills = hard_skills.some((s) => String(s.id) === String(skill.id))
+        ? hard_skills
+        : [...hard_skills, skill];
+      const prevSteps = base.career_path?.steps || [];
+      const nextProfile: UserProfile = {
+        ...base,
+        hard_skills: nextSkills,
+        career_path: {
+          ...base.career_path,
+          steps: [...prevSteps, step],
+        },
+      };
+      const data = await api.saveProfile(nextProfile);
+      setProfileData(data.profile_data);
+      setHasProfile(true);
+    },
+    [profileData]
+  );
+
+  const resetCareerPath = useCallback(async () => {
+    const base: UserProfile = profileData || {
+      experience: [],
+      education: [],
+      hard_skills: selectedSkills,
+      languages: [],
+      interested_industries: [],
+    };
+    const next = { ...base, career_path: { ...base.career_path, steps: [] } };
+    const data = await api.saveProfile(next);
+    setProfileData(data.profile_data);
+  }, [profileData, selectedSkills]);
 
   const profileSkillIds = useCallback(
     () =>
@@ -192,6 +277,7 @@ export default function App() {
     setExploreView("results");
     setOfferDetail(null);
     setSegmentData(null);
+    setExploreReturnMode("skills");
   };
 
   const openOfferDetail = async (offerId: string | number) => {
@@ -211,8 +297,10 @@ export default function App() {
 
   const openSegment = async (
     segment: SegmentKey,
-    initialFilters?: { region_name: string; position_level_groups: string[] }
+    initialFilters?: { region_name: string; position_level_groups: string[] },
+    returnMode?: string
   ) => {
+    if (returnMode) setExploreReturnMode(returnMode);
     const nextFilters = initialFilters ?? {
       region_name: filters.region_name,
       position_level_groups: filters.position_level_groups,
@@ -496,6 +584,10 @@ export default function App() {
                   } else {
                     setSegmentData(null);
                     setExploreView("results");
+                    if (exploreReturnMode === "path") {
+                      setMode("path");
+                    }
+                    setExploreReturnMode("skills");
                   }
                 }}
                 onOpenOffer={openOfferDetail}
@@ -513,6 +605,17 @@ export default function App() {
 
       {mode === "chat" ? (
         <ChatAdvisor />
+      ) : mode === "path" ? (
+        <CareerPathView
+          profileData={profileData}
+          selectedSkills={selectedSkills}
+          onEditProfile={() => setShowProfileWizard(true)}
+          onTakeBranch={takeCareerBranch}
+          onResetPath={resetCareerPath}
+          onOpenSegment={(segment, returnMode) =>
+            openSegment(segment, emptySegmentFilters, returnMode)
+          }
+        />
       ) : (
         <div className="app">
           {!isProfileLoading && isLoggedIn && !hasProfile && (

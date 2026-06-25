@@ -115,4 +115,30 @@ export const api = {
         position_level_groups: filters.position_level_groups || [],
       }),
     }),
+  rankCareerSegments: (
+    skillIds: string[],
+    interestedIndustries: unknown[] = [],
+    limit = 15
+  ): Promise<any> =>
+    request("/api/v1/market/segments/rank/", {
+      method: "POST",
+      body: JSON.stringify({
+        skill_ids: skillIds,
+        interested_industries: interestedIndustries,
+        limit,
+      }),
+    }),
+  getCareerRoadmap: (
+    skillIds: string[],
+    interestedIndustries: unknown[] = [],
+    careerPath: Record<string, unknown> = {}
+  ): Promise<any> =>
+    request("/api/v1/market/career-roadmap/", {
+      method: "POST",
+      body: JSON.stringify({
+        skill_ids: skillIds,
+        interested_industries: interestedIndustries,
+        career_path: careerPath,
+      }),
+    }),
 };
