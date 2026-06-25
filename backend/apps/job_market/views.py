@@ -639,10 +639,23 @@ class CareerRoadmapView(APIView):
         skill_ids = request.data.get("skill_ids") or []
         industries = request.data.get("interested_industries")
         career_path = request.data.get("career_path") or {}
-        tree = build_career_tree(skill_ids, industries, career_path)
+        experience = request.data.get("experience") or []
+        tree = build_career_tree(skill_ids, industries, career_path, experience=experience)
         if tree is None:
             return Response(
                 {"detail": "Brak danych do wygenerowania ścieżki kariery."},
                 status=status.HTTP_404_NOT_FOUND,
             )
         return Response(tree)
+
+
+class CareerSegmentInsightsView(APIView):
+    """Batch salary / level insight for career-path segments (lazy-loaded)."""
+
+    def post(self, request):
+        from apps.job_market.services.career_tree import batch_segment_insights
+
+        segments = request.data.get("segments") or []
+        if not segments:
+            return Response({"insights": {}})
+        return Response({"insights": batch_segment_insights(segments)})

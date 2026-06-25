@@ -258,7 +258,11 @@ def _skill_fit(user_skill_ids: list[str], top_skills: list[dict]) -> dict:
 
 
 def _segment_match_score(
-    skill_ids: list[str], lead_main: str, lead_sub: str, filters: dict | None = None
+    skill_ids: list[str],
+    lead_main: str,
+    lead_sub: str,
+    filters: dict | None = None,
+    match_limit: int = 60,
 ) -> dict | None:
     if not skill_ids:
         return None
@@ -269,7 +273,7 @@ def _segment_match_score(
     }
     results = matching.match_by_skills(
         skill_ids,
-        limit=60,
+        limit=match_limit,
         min_similarity=0,
         filters=seg_filters,
     )

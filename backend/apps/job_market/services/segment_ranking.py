@@ -74,6 +74,8 @@ def rank_segments_for_profile(
     skill_ids: list[str],
     industries: list | None = None,
     limit: int = 15,
+    max_candidates: int = MAX_CANDIDATES,
+    fast: bool = False,
 ) -> list[dict]:
     if not skill_ids:
         return []
@@ -87,7 +89,7 @@ def rank_segments_for_profile(
         base.values("lead_main_category", "lead_sub_category")
         .annotate(offer_count=Count("id"))
         .filter(offer_count__gte=MIN_SEGMENT_SIZE)
-        .order_by("-offer_count")[:MAX_CANDIDATES]
+        .order_by("-offer_count")[:max_candidates]
     )
 
     ranked: list[dict] = []
@@ -96,26 +98,35 @@ def rank_segments_for_profile(
         lead_sub = row["lead_sub_category"]
         size = row["offer_count"]
         match = _segment_match_score(skill_ids, lead_main, lead_sub) or {}
-        top_skills = _enrich_skill_pcts(_top_skills_in_segment(lead_main, lead_sub), size)
-        fit = _skill_fit(skill_ids, top_skills)
-        qs = JobOffer.objects.filter(
-            lead_main_category=lead_main,
-            lead_sub_category=lead_sub,
-        )
-        sal_uop = _salary_stats(qs.filter(salary_uop_duration__icontains="mies"), "uop")
+        entry = {
+            "lead_main_category": lead_main,
+            "lead_sub_category": lead_sub,
+            "display_label": segment_display_label(lead_main, lead_sub),
+            "offer_count": size,
+            "match_pct": match.get("avg_similarity_pct", 0),
+        }
+        if not fast:
+            top_skills = _enrich_skill_pcts(_top_skills_in_segment(lead_main, lead_sub), size)
+            fit = _skill_fit(skill_ids, top_skills)
+            qs = JobOffer.objects.filter(
+                lead_main_category=lead_main,
+                lead_sub_category=lead_sub,
+            )
+            sal_uop = _salary_stats(qs.filter(salary_uop_duration__icontains="mies"), "uop")
+            entry["skill_coverage_pct"] = fit["coverage_pct"]
+            entry["top_missing_skills"] = fit["missing"][:5]
+            entry["median_salary_uop"] = sal_uop["median"] if sal_uop else None
+        else:
+            entry["skill_coverage_pct"] = 0
+            entry["top_missing_skills"] = []
+            entry["median_salary_uop"] = None
+        ranked.append(entry)
 
-        ranked.append(
-            {
-                "lead_main_category": lead_main,
-                "lead_sub_category": lead_sub,
-                "display_label": segment_display_label(lead_main, lead_sub),
-                "offer_count": size,
-                "match_pct": match.get("avg_similarity_pct", 0),
-                "skill_coverage_pct": fit["coverage_pct"],
-                "top_missing_skills": fit["missing"][:5],
-                "median_salary_uop": sal_uop["median"] if sal_uop else None,
-            }
+    ranked.sort(
+        key=lambda x: (
+            -x["match_pct"],
+            -x.get("skill_coverage_pct", 0),
+            -x["offer_count"],
         )
-
-    ranked.sort(key=lambda x: (-x["match_pct"], -x["skill_coverage_pct"], -x["offer_count"]))
+    )
     return ranked[: min(limit, 30)]
