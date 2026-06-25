@@ -94,4 +94,25 @@ export const api = {
     );
     return request(`/api/v1/match/similar/?${p}`);
   },
+  getOfferDetail: (offerId: string | number, skillIds: string[] = []): Promise<any> =>
+    request(`/api/v1/offers/${offerId}/`, {
+      method: "POST",
+      body: JSON.stringify({ skill_ids: skillIds }),
+    }),
+  getSegmentAnalytics: (
+    leadMain: string,
+    leadSub: string,
+    skillIds: string[] = [],
+    filters: Partial<Pick<Filters, "region_name" | "position_level_groups">> = {}
+  ): Promise<any> =>
+    request("/api/v1/market/segments/analytics/", {
+      method: "POST",
+      body: JSON.stringify({
+        lead_main_category: leadMain,
+        lead_sub_category: leadSub,
+        skill_ids: skillIds,
+        region_name: filters.region_name || "",
+        position_level_groups: filters.position_level_groups || [],
+      }),
+    }),
 };

@@ -505,3 +505,108 @@ class ChatSuggestionsView(APIView):
         filled_prompts = fill_prompt_variables_with_llm(top_prompts, profile_data, recent_messages)
         
         return Response({"suggestions": filled_prompts})
+
+
+def _skill_ids_from_request(request) -> list[str]:
+    if request.method == "POST":
+        ids = request.data.get("skill_ids")
+        if ids:
+            return list(ids)
+    raw = request.query_params.get("skill_ids", "")
+    if raw:
+        return [s.strip() for s in raw.split(",") if s.strip()]
+    return []
+
+
+def _segment_filters_from_request(request) -> dict | None:
+    data = request.data if request.method == "POST" else request.query_params
+    filters: dict = {}
+    region = (data.get("region_name") or "").strip()
+    if region:
+        filters["region_name"] = region
+    groups = data.get("position_level_groups")
+    if groups:
+        filters["position_level_groups"] = list(groups)
+    elif request.method == "GET":
+        raw_groups = request.query_params.getlist("position_level_groups")
+        if raw_groups:
+            filters["position_level_groups"] = raw_groups
+    return filters or None
+
+
+def _segment_analytics_response(request, lead_main: str, lead_sub: str):
+    from apps.job_market.services.segment_analytics import (
+        get_segment_analytics,
+        get_segment_sample_offers,
+    )
+
+    skill_ids = _skill_ids_from_request(request)
+    seg_filters = _segment_filters_from_request(request)
+    analytics = get_segment_analytics(
+        lead_main, lead_sub, skill_ids or None, filters=seg_filters
+    )
+    if analytics is None:
+        return None
+    analytics["sample_offers"] = get_segment_sample_offers(
+        lead_main,
+        lead_sub,
+        skill_ids or None,
+        limit=12,
+        filters=seg_filters,
+    )
+    return analytics
+
+
+class OfferDetailView(APIView):
+    """Full job offer detail + LightCast skills and profile overlap."""
+
+    def get(self, request, offer_id: int):
+        from apps.job_market.services.offer_detail import get_offer_detail
+
+        skill_ids = _skill_ids_from_request(request)
+        detail = get_offer_detail(
+            offer_id,
+            user_skill_ids=skill_ids if skill_ids else None,
+        )
+        if detail is None:
+            return Response({"detail": "Oferta nie istnieje."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(detail)
+
+    def post(self, request, offer_id: int):
+        from apps.job_market.services.offer_detail import get_offer_detail
+
+        skill_ids = _skill_ids_from_request(request)
+        detail = get_offer_detail(offer_id, user_skill_ids=skill_ids)
+        if detail is None:
+            return Response({"detail": "Oferta nie istnieje."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(detail)
+
+
+class SegmentAnalyticsView(APIView):
+    """Analytics for lead_main × lead_sub segment (skills, salary, seniority from DB)."""
+
+    def get(self, request):
+        lead_main = (request.query_params.get("lead_main_category") or "").strip()
+        lead_sub = (request.query_params.get("lead_sub_category") or "").strip()
+        if not lead_main or not lead_sub:
+            return Response(
+                {"detail": "Podaj lead_main_category i lead_sub_category."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        analytics = _segment_analytics_response(request, lead_main, lead_sub)
+        if analytics is None:
+            return Response({"detail": "Brak ofert w tym segmencie."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(analytics)
+
+    def post(self, request):
+        lead_main = (request.data.get("lead_main_category") or "").strip()
+        lead_sub = (request.data.get("lead_sub_category") or "").strip()
+        if not lead_main or not lead_sub:
+            return Response(
+                {"detail": "Podaj lead_main_category i lead_sub_category."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        analytics = _segment_analytics_response(request, lead_main, lead_sub)
+        if analytics is None:
+            return Response({"detail": "Brak ofert w tym segmencie."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(analytics)

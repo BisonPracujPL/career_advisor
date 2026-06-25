@@ -119,12 +119,22 @@ def explain_overlap(user_skill_ids: list[str], offer_skills: list) -> dict:
     }
 
 
-def serialize_offer_row(es: ExtractedSkills, similarity: float, user_skill_ids: list[str] | None):
+def serialize_offer_row(
+    es: ExtractedSkills,
+    role_similarity: float,
+    user_skill_ids: list[str] | None = None,
+    user_similarity: float | None = None,
+):
+    """role_similarity = cosine to query vector (sort key); user_* = profile vs offer."""
     offer = es.offer
     overlap = (
         explain_overlap(user_skill_ids, es.skills)
-        if user_skill_ids is not None
+        if user_skill_ids
         else None
+    )
+    role_pct = int(round(role_similarity * 100))
+    user_pct = (
+        int(round(user_similarity * 100)) if user_similarity is not None else None
     )
     return {
         "offer_id": offer.id,
@@ -133,10 +143,10 @@ def serialize_offer_row(es: ExtractedSkills, similarity: float, user_skill_ids: 
         "lead_main_category": offer.lead_main_category or "",
         "lead_sub_category": offer.lead_sub_category or "",
         "position_levels": offer.position_levels or [],
-        "similarity": round(similarity, 4),
-        "similarity_pct": int(round(similarity * 100)),
-        # Primary UI score: TF-IDF cosine (same metric as sort order).
-        "display_pct": int(round(similarity * 100)),
+        "similarity": round(role_similarity, 4),
+        "role_similarity_pct": role_pct,
+        "similarity_pct": user_pct,
+        "display_pct": user_pct if user_pct is not None else role_pct,
         "overlap": overlap,
     }
 
@@ -164,6 +174,22 @@ def find_similar_offers(
 
     # Pull top candidates in SQL (cosine distance), then apply min_similarity.
     candidates = list(qs.order_by("distance")[: max(limit * 8, 50)])
+
+    user_vec = build_profile_vector(user_skill_ids) if user_skill_ids else None
+    user_sim_map: dict[int, float] = {}
+    if user_vec and candidates:
+        cand_pks = [es.pk for es in candidates]
+        for row in (
+            ExtractedSkills.objects.filter(pk__in=cand_pks)
+            .annotate(udist=CosineDistance("skill_vector", user_vec))
+            .values("pk", "udist")
+        ):
+            udist = row["udist"]
+            if udist is not None:
+                d = float(udist)
+                if d == d:
+                    user_sim_map[row["pk"]] = 1.0 - d
+
     results = []
     for es in candidates:
         if es.distance is None:
@@ -174,7 +200,14 @@ def find_similar_offers(
         sim = 1.0 - dist
         if sim < min_similarity:
             continue
-        results.append(serialize_offer_row(es, sim, user_skill_ids))
+        results.append(
+            serialize_offer_row(
+                es,
+                sim,
+                user_skill_ids,
+                user_sim_map.get(es.pk),
+            )
+        )
         if len(results) >= limit:
             break
     return results
@@ -185,6 +218,26 @@ def match_by_skills(skill_ids: list[str], **kwargs):
     return find_similar_offers(vec, user_skill_ids=skill_ids, **kwargs)
 
 
+def profile_offer_similarity(offer_id: int, user_skill_ids: list[str]) -> int | None:
+    """Cosine similarity (0–100) between user profile vector and one offer."""
+    if not user_skill_ids:
+        return None
+    vec = build_profile_vector(user_skill_ids)
+    if vec is None:
+        return None
+    es = (
+        ExtractedSkills.objects.filter(offer_id=offer_id, skill_vector__isnull=False)
+        .annotate(distance=CosineDistance("skill_vector", vec))
+        .first()
+    )
+    if es is None or es.distance is None:
+        return None
+    dist = float(es.distance)
+    if dist != dist:
+        return None
+    return int(round((1.0 - dist) * 100))
+
+
 def match_by_offer_id(offer_id: int, **kwargs):
     try:
         es = ExtractedSkills.objects.select_related("offer").get(
@@ -193,9 +246,11 @@ def match_by_offer_id(offer_id: int, **kwargs):
     except ExtractedSkills.DoesNotExist:
         return None, []
     kwargs.setdefault("exclude_offer_id", offer_id)
-    seed_skill_ids = [s["skill_id"] for s in (es.skills or [])]
+    user_skill_ids = kwargs.pop("user_skill_ids", None)
     rows = find_similar_offers(
-        es.skill_vector, user_skill_ids=seed_skill_ids, **kwargs
+        es.skill_vector,
+        user_skill_ids=user_skill_ids,
+        **kwargs,
     )
     seed = {
         "offer_id": es.offer.id,

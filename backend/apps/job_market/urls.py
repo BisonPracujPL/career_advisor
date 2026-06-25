@@ -21,6 +21,8 @@ urlpatterns = [
     path("match/by-skills/", views.MatchBySkillsView.as_view()),
     path("match/similar/", views.MatchSimilarOffersView.as_view()),
     path("offers/search/", views.OfferSearchView.as_view()),
+    path("offers/<int:offer_id>/", views.OfferDetailView.as_view()),
+    path("market/segments/analytics/", views.SegmentAnalyticsView.as_view()),
     path("offers/categories/", views.OfferCategoriesView.as_view()),
     path(
         "offers/categories/<str:main_cat>/subcategories/",

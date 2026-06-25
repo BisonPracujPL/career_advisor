@@ -6,7 +6,18 @@ import { Navbar } from "./components/Navbar";
 import { MultiSelect, Collapse, Chip } from "./components/ui";
 import { OfferCard } from "./components/OfferCard";
 import { ChatAdvisor } from "./components/ChatAdvisor";
-import { Filters, Skill, Offer, UserProfile } from "./types";
+import { OfferDetailView } from "./explore/OfferDetailView";
+import { SegmentAnalyticsView } from "./explore/SegmentAnalyticsView";
+import {
+  Filters,
+  Skill,
+  Offer,
+  UserProfile,
+  ExploreView,
+  OfferDetail,
+  SegmentAnalytics,
+  SegmentKey,
+} from "./types";
 
 export default function App() {
   const [mode, setMode] = useState("skills");
@@ -39,6 +50,18 @@ export default function App() {
   const [resultMeta, setResultMeta] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const [exploreView, setExploreView] = useState<ExploreView>("results");
+  const [exploreBack, setExploreBack] = useState<ExploreView>("results");
+  const [offerDetail, setOfferDetail] = useState<OfferDetail | null>(null);
+  const [segmentData, setSegmentData] = useState<SegmentAnalytics | null>(null);
+  const [exploreLoading, setExploreLoading] = useState(false);
+  const emptySegmentFilters = {
+    region_name: "",
+    position_level_groups: [] as string[],
+  };
+  const [segmentFiltersDraft, setSegmentFiltersDraft] = useState(emptySegmentFilters);
+  const [segmentFiltersApplied, setSegmentFiltersApplied] = useState(emptySegmentFilters);
 
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("auth_token"));
   const [, setShowAuth] = useState(!localStorage.getItem("auth_token"));
@@ -153,6 +176,103 @@ export default function App() {
     setSkillHits([]);
   }, []);
 
+  const removeSkill = useCallback((skillId: string) => {
+    setSelectedSkills((prev) => prev.filter((s) => String(s.id) !== skillId));
+  }, []);
+
+  const profileSkillIds = useCallback(
+    () =>
+      selectedSkills
+        .map((s) => String(s.id))
+        .filter((id) => id && id !== "undefined"),
+    [selectedSkills]
+  );
+
+  const resetExplore = () => {
+    setExploreView("results");
+    setOfferDetail(null);
+    setSegmentData(null);
+  };
+
+  const openOfferDetail = async (offerId: string | number) => {
+    setExploreLoading(true);
+    setError("");
+    setExploreBack(exploreView);
+    try {
+      const detail = await api.getOfferDetail(offerId, profileSkillIds());
+      setOfferDetail(detail);
+      setExploreView("offer");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setExploreLoading(false);
+    }
+  };
+
+  const openSegment = async (
+    segment: SegmentKey,
+    initialFilters?: { region_name: string; position_level_groups: string[] }
+  ) => {
+    const nextFilters = initialFilters ?? {
+      region_name: filters.region_name,
+      position_level_groups: filters.position_level_groups,
+    };
+    setSegmentFiltersDraft(nextFilters);
+    setSegmentFiltersApplied(nextFilters);
+    setExploreLoading(true);
+    setError("");
+    setExploreBack(exploreView);
+    try {
+      const data = await api.getSegmentAnalytics(
+        segment.lead_main_category,
+        segment.lead_sub_category,
+        profileSkillIds(),
+        nextFilters
+      );
+      setSegmentData(data);
+      setExploreView("segment");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setExploreLoading(false);
+    }
+  };
+
+  const applySegmentFilters = () => {
+    setSegmentFiltersApplied({ ...segmentFiltersDraft });
+  };
+
+  const segmentFiltersDirty =
+    segmentFiltersDraft.region_name !== segmentFiltersApplied.region_name ||
+    segmentFiltersDraft.position_level_groups.join("|") !==
+      segmentFiltersApplied.position_level_groups.join("|");
+
+  useEffect(() => {
+    if (exploreView !== "offer" || !offerDetail) return;
+    api
+      .getOfferDetail(offerDetail.offer_id, profileSkillIds())
+      .then(setOfferDetail)
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSkills]);
+
+  useEffect(() => {
+    if (exploreView !== "segment" || !segmentData) return;
+    const { lead_main_category, lead_sub_category } = segmentData;
+    setExploreLoading(true);
+    api
+      .getSegmentAnalytics(
+        lead_main_category,
+        lead_sub_category,
+        profileSkillIds(),
+        segmentFiltersApplied
+      )
+      .then(setSegmentData)
+      .catch(() => {})
+      .finally(() => setExploreLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSkills, segmentFiltersApplied]);
+
   const selectPillar = (pillarId: string) => {
     setFilters((f) => ({
       ...f,
@@ -260,6 +380,7 @@ export default function App() {
       setError("");
       setResultMeta(null);
       setShowProfileWizard(false);
+      resetExplore();
     },
     isLoggedIn,
     setShowAuth,
@@ -295,6 +416,92 @@ export default function App() {
               setIsLoggedIn(true);
             }}
           />
+        </div>
+      </>
+    );
+  }
+
+  if (exploreView === "offer") {
+    return (
+      <>
+        <Navbar {...navProps} />
+        <div className="explore-page">
+          {error && (
+            <div className="alert explore-page__alert" role="alert">
+              {error}
+            </div>
+          )}
+          {exploreLoading && !offerDetail ? (
+            <div className="loading">
+              <div className="spinner" />
+              <p>Ładuję ofertę…</p>
+            </div>
+          ) : (
+            offerDetail && (
+              <OfferDetailView
+                detail={offerDetail}
+                selectedSkills={selectedSkills}
+                onAddSkill={addSkill}
+                onRemoveSkill={removeSkill}
+                onBack={() => {
+                  if (exploreBack === "segment" && segmentData) {
+                    setExploreView("segment");
+                  } else {
+                    setOfferDetail(null);
+                    setExploreView("results");
+                  }
+                }}
+                onOpenSegment={(seg) => openSegment(seg)}
+                onOpenOffer={openOfferDetail}
+              />
+            )
+          )}
+        </div>
+      </>
+    );
+  }
+
+  if (exploreView === "segment") {
+    return (
+      <>
+        <Navbar {...navProps} />
+        <div className="explore-page">
+          {error && (
+            <div className="alert explore-page__alert" role="alert">
+              {error}
+            </div>
+          )}
+          {exploreLoading && !segmentData ? (
+            <div className="loading">
+              <div className="spinner" />
+              <p>Ładuję analizę segmentu…</p>
+            </div>
+          ) : (
+            segmentData && (
+              <SegmentAnalyticsView
+                data={segmentData}
+                selectedSkills={selectedSkills}
+                filtersDraft={segmentFiltersDraft}
+                filtersApplied={segmentFiltersApplied}
+                levelGroups={levelGroups}
+                regions={filterOpts?.regions || []}
+                filtersDirty={segmentFiltersDirty}
+                onFiltersDraftChange={setSegmentFiltersDraft}
+                onApplyFilters={applySegmentFilters}
+                onAddSkill={addSkill}
+                onRemoveSkill={removeSkill}
+                onBack={() => {
+                  if (exploreBack === "offer" && offerDetail) {
+                    setExploreView("offer");
+                  } else {
+                    setSegmentData(null);
+                    setExploreView("results");
+                  }
+                }}
+                onOpenOffer={openOfferDetail}
+              />
+            )
+          )}
         </div>
       </>
     );
@@ -621,7 +828,11 @@ export default function App() {
 
               <div className="offers-grid">
                 {offers.map((o: any) => (
-                  <OfferCard key={o.offer_id} offer={o} />
+                  <OfferCard
+                    key={o.offer_id}
+                    offer={o}
+                    onSelect={openOfferDetail}
+                  />
                 ))}
               </div>
             </main>

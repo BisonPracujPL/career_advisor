@@ -4,14 +4,32 @@ import { ScoreRing, Chip } from './ui';
 
 interface OfferCardProps {
   offer: Offer;
+  onSelect?: (offerId: string | number) => void;
 }
 
-export function OfferCard({ offer }: OfferCardProps) {
+export function OfferCard({ offer, onSelect }: OfferCardProps) {
   const ov = offer.overlap;
   const matchPct = offer.similarity_pct ?? offer.display_pct ?? 0;
   const coveragePct = ov?.offer_coverage_pct ?? 0;
+  const clickable = !!onSelect;
+
   return (
-    <article className="offer-card">
+    <article
+      className={`offer-card ${clickable ? "offer-card--clickable" : ""}`}
+      onClick={clickable ? () => onSelect!(offer.offer_id) : undefined}
+      onKeyDown={
+        clickable
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelect!(offer.offer_id);
+              }
+            }
+          : undefined
+      }
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+    >
       <div className="score-block">
         <ScoreRing pct={matchPct} />
         <span className="score-label">Dopasowanie</span>
@@ -63,6 +81,9 @@ export function OfferCard({ offer }: OfferCardProps) {
               </details>
             )}
           </div>
+        )}
+        {clickable && (
+          <p className="offer-open-hint">Szczegóły oferty ›</p>
         )}
       </div>
     </article>

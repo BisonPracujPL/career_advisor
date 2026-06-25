@@ -9,7 +9,10 @@ POSITION_LEVEL_GROUPS = [
     {
         "id": "junior",
         "label": "Junior",
-        "values": ["młodszy specjalista / młodsza specjalistka (junior)"],
+        "values": [
+            "młodszy specjalista / młodsza specjalistka (junior)",
+            "młodszy specjalista (Junior)",
+        ],
     },
     {
         "id": "mid",
@@ -22,7 +25,10 @@ POSITION_LEVEL_GROUPS = [
     {
         "id": "senior",
         "label": "Senior",
-        "values": ["starszy specjalista / starsza specjalistka (senior)"],
+        "values": [
+            "starszy specjalista / starsza specjalistka (senior)",
+            "starszy specjalista (Senior)",
+        ],
     },
     {
         "id": "expert",
