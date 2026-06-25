@@ -27,6 +27,8 @@ export type IndustryItem = string | { main: string; subs: string[] };
 export interface CareerPathStep {
   skill_id: string;
   skill_name: string;
+  skill_ids?: string[];
+  step_type?: "single" | "bundle";
   lead_main_category: string;
   lead_sub_category: string;
   match_before: number;
@@ -182,6 +184,28 @@ export interface CareerPathSegment {
 
 export type RoadmapNodeStatus = "completed" | "active" | "locked" | "available";
 
+export interface SegmentSalaryLevel {
+  level_id: string;
+  label: string;
+  median: number;
+  offers: number;
+}
+
+export interface SegmentInsight {
+  offer_count: number;
+  median_salary_uop: number | null;
+  salary_by_level: Partial<Record<"junior" | "mid" | "senior", SegmentSalaryLevel | null>>;
+}
+
+export interface TreeSegmentSummary {
+  display_label: string;
+  match_pct: number;
+  lead_main_category: string;
+  lead_sub_category: string;
+  offer_count?: number;
+  segment_insight?: SegmentInsight;
+}
+
 export interface TreeStateNode {
   id: string;
   kind: "state";
@@ -192,20 +216,18 @@ export interface TreeStateNode {
   skill_ids: string[];
   skills: Skill[];
   match_pct: number;
-  top_segments: {
-    display_label: string;
-    match_pct: number;
-    lead_main_category: string;
-    lead_sub_category: string;
-  }[];
+  top_segments: TreeSegmentSummary[];
 }
 
 export interface TreeBranchNode {
   id: string;
   kind: "branch";
+  branch_type?: "single" | "bundle";
   status: "completed" | "available" | "locked";
   skill_id: string;
   skill_name: string;
+  skill_ids?: string[];
+  skills?: Skill[];
   title: string;
   subtitle: string;
   lead_main_category: string;
@@ -215,6 +237,7 @@ export interface TreeBranchNode {
   match_after: number;
   match_delta: number;
   pct_of_segment?: number;
+  segment_insight?: SegmentInsight;
 }
 
 export type TreeNode = TreeStateNode | TreeBranchNode;
@@ -237,6 +260,45 @@ export interface CareerTree {
     lead_sub_category: string;
   } | null;
   total_skills: number;
+  branch_comparison: BranchComparison[];
+  next_level_readiness: NextLevelReadiness | null;
+  career_narrative: CareerNarrative;
+}
+
+export interface BranchComparison {
+  skill_name: string;
+  branch_type?: "single" | "bundle";
+  segment_label: string;
+  match_before: number;
+  match_after: number;
+  match_delta: number;
+  lead_main_category: string;
+  lead_sub_category: string;
+}
+
+export interface NextLevelReadiness {
+  current_level: "junior" | "mid" | "senior";
+  next_level: "junior" | "mid" | "senior";
+  segment_label: string;
+  lead_main_category: string;
+  lead_sub_category: string;
+  match_now: number;
+  match_target_level: number;
+  match_after_bundle: number;
+  bundle_delta: number;
+  missing_skills: { id: string; name: string }[];
+}
+
+export interface CareerNarrative {
+  headline: string;
+  body: string;
+  goal_label?: string | null;
+  recommended_skill?: string;
+  recommended_delta?: number;
+}
+
+export function segmentInsightKey(leadMain: string, leadSub: string) {
+  return `${leadMain}|${leadSub}`;
 }
 
 /** @deprecated legacy linear roadmap */

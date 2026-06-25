@@ -1,4 +1,4 @@
-import { Filters } from "./types";
+import { Filters, SegmentInsight } from "./types";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -131,7 +131,8 @@ export const api = {
   getCareerRoadmap: (
     skillIds: string[],
     interestedIndustries: unknown[] = [],
-    careerPath: Record<string, unknown> = {}
+    careerPath: Record<string, unknown> = {},
+    experience: unknown[] = []
   ): Promise<any> =>
     request("/api/v1/market/career-roadmap/", {
       method: "POST",
@@ -139,6 +140,14 @@ export const api = {
         skill_ids: skillIds,
         interested_industries: interestedIndustries,
         career_path: careerPath,
+        experience,
       }),
+    }),
+  getCareerInsights: (
+    segments: { lead_main_category: string; lead_sub_category: string }[]
+  ): Promise<{ insights: Record<string, SegmentInsight> }> =>
+    request("/api/v1/market/career-roadmap/insights/", {
+      method: "POST",
+      body: JSON.stringify({ segments }),
     }),
 };
