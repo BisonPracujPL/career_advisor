@@ -1,12 +1,15 @@
 import { useMemo } from "react";
 import { Chip } from "../components/ui";
+import { CareerOptionMatrix } from "./CareerOptionMatrix";
 import {
   CareerTree,
-  SegmentKey,
+  SegmentInsight,
   Skill,
   TreeBranchNode,
   TreeNode,
+  TreeSegmentSummary,
   TreeStateNode,
+  segmentInsightKey,
 } from "../types";
 
 const STATE_SIZE = 80;
@@ -15,6 +18,106 @@ const CANVAS_WIDTH = 960;
 const CANVAS_CENTER = CANVAS_WIDTH / 2;
 const LEVEL_HEIGHT = 210;
 const BRANCH_Y_OFFSET = 96;
+
+function formatPln(n: number | null | undefined) {
+  if (n == null) return "—";
+  return `${Math.round(n).toLocaleString("pl-PL")} zł`;
+}
+
+function MatchMeter({
+  before,
+  after,
+  delta,
+}: {
+  before: number;
+  after: number;
+  delta?: number;
+}) {
+  const gain = delta ?? Math.max(0, after - before);
+  return (
+    <div className="tree-match-meter">
+      <div className="tree-match-meter__head">
+        <span>Wzrost dopasowania TF-IDF</span>
+        <strong className="tree-match-meter__delta">+{gain}%</strong>
+      </div>
+      <div className="tree-match-meter__track" aria-hidden>
+        <div className="tree-match-meter__before" style={{ width: `${Math.min(before, 100)}%` }} />
+        <div
+          className="tree-match-meter__gain"
+          style={{
+            left: `${Math.min(before, 100)}%`,
+            width: `${Math.min(gain, 100 - before)}%`,
+          }}
+        />
+      </div>
+      <div className="tree-match-meter__labels">
+        <span>Teraz: {before}%</span>
+        <span>Po skillu: <strong>{after}%</strong></span>
+      </div>
+    </div>
+  );
+}
+
+function SalaryLevels({ insight }: { insight?: SegmentInsight }) {
+  if (!insight) return null;
+  const levels = [
+    { key: "junior" as const, title: "Junior" },
+    { key: "mid" as const, title: "Mid" },
+    { key: "senior" as const, title: "Senior" },
+  ];
+
+  return (
+    <div className="tree-salary-grid">
+      {levels.map(({ key, title }) => {
+        const row = insight.salary_by_level?.[key];
+        return (
+          <div key={key} className={`tree-salary-card ${row ? "" : "tree-salary-card--empty"}`}>
+            <span className="tree-salary-card__level">{title}</span>
+            <strong className="tree-salary-card__amount">
+              {row ? formatPln(row.median) : "—"}
+            </strong>
+            <span className="tree-salary-card__meta">
+              {row ? `${row.offers} ofert` : "brak danych"}
+            </span>
+            <span className="tree-salary-card__period">UoP / mies.</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function SegmentInsightBlock({
+  label,
+  matchPct,
+  insight,
+}: {
+  label: string;
+  matchPct?: number;
+  insight?: SegmentInsight;
+}) {
+  if (!insight) return null;
+  return (
+    <div className="tree-insight-block">
+      <div className="tree-insight-block__head">
+        <div>
+          {label ? <h4>{label}</h4> : null}
+          <p>
+            {insight.offer_count.toLocaleString("pl-PL")} ofert w segmencie
+            {matchPct != null ? ` · dopasowanie ${matchPct}%` : ""}
+          </p>
+        </div>
+        {insight.median_salary_uop != null && (
+          <div className="tree-insight-block__median">
+            <span>Mediana</span>
+            <strong>{formatPln(insight.median_salary_uop)}</strong>
+          </div>
+        )}
+      </div>
+      <SalaryLevels insight={insight} />
+    </div>
+  );
+}
 
 interface LayoutItem {
   id: string;
@@ -87,10 +190,7 @@ function layoutTree(tree: CareerTree) {
   return { items, edges, height, width: CANVAS_WIDTH };
 }
 
-function curvePath(
-  from: { x: number; y: number },
-  to: { x: number; y: number }
-) {
+function curvePath(from: { x: number; y: number }, to: { x: number; y: number }) {
   const midY = (from.y + to.y) / 2;
   return `M ${from.x} ${from.y} C ${from.x} ${midY}, ${to.x} ${midY}, ${to.x} ${to.y}`;
 }
@@ -112,6 +212,17 @@ function SkillIcon() {
       <path
         fill="currentColor"
         d="M12 2l3 6 6 .9-4.5 4.4 1 6.1L12 17l-5.5 2.4 1-6.1L3 8.9 9 8l3-6z"
+      />
+    </svg>
+  );
+}
+
+function BundleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden>
+      <path
+        fill="currentColor"
+        d="M4 8h16v2H4V8zm0 5h10v2H4v-2zm0 5h14v2H4v-2z"
       />
     </svg>
   );
@@ -140,11 +251,15 @@ function TreeNodeView({ item, selected, unlocking, onSelect }: TreeNodeViewProps
   const { node, x, y, size } = item;
   const isState = node.kind === "state";
   const isBranch = node.kind === "branch";
+  const branch = isBranch ? (node as TreeBranchNode) : null;
+  const isBundle = branch?.branch_type === "bundle";
   const side = x >= CANVAS_CENTER ? "right" : "left";
 
   return (
     <div
-      className={`tree-node-wrap tree-node-wrap--${isState ? "state" : "branch"}`}
+      className={`tree-node-wrap tree-node-wrap--${isState ? "state" : "branch"} ${
+        isBundle ? "tree-node-wrap--bundle" : ""
+      }`}
       style={{
         left: x - size / 2,
         top: y - size / 2,
@@ -156,11 +271,13 @@ function TreeNodeView({ item, selected, unlocking, onSelect }: TreeNodeViewProps
         type="button"
         className={`tree-node tree-node--${node.status} tree-node--${node.kind} ${
           selected ? "tree-node--selected" : ""
-        } ${unlocking ? "tree-node--unlocking" : ""}`}
+        } ${unlocking ? "tree-node--unlocking" : ""} ${isBundle ? "tree-node--bundle" : ""}`}
         style={{ width: size, height: size }}
         onClick={() => onSelect(node)}
       >
-        <span className="tree-node__icon">{isState ? <StateIcon /> : <SkillIcon />}</span>
+        <span className="tree-node__icon">
+          {isState ? <StateIcon /> : isBundle ? <BundleIcon /> : <SkillIcon />}
+        </span>
         {node.status === "completed" && <CheckBadge />}
         {isBranch && node.status === "available" && (
           <DeltaBadge delta={(node as TreeBranchNode).match_delta} />
@@ -181,19 +298,17 @@ function TreeNodeView({ item, selected, unlocking, onSelect }: TreeNodeViewProps
   );
 }
 
-interface CareerTreeCanvasProps {
-  data: CareerTree;
-  selectedNode: TreeNode | null;
-  unlockingId?: string | null;
-  onSelectNode: (node: TreeNode) => void;
-}
-
 export function CareerTreeCanvas({
   data,
   selectedNode,
   unlockingId,
   onSelectNode,
-}: CareerTreeCanvasProps) {
+}: {
+  data: CareerTree;
+  selectedNode: TreeNode | null;
+  unlockingId?: string | null;
+  onSelectNode: (node: TreeNode) => void;
+}) {
   const layout = useMemo(() => layoutTree(data), [data]);
 
   return (
@@ -227,169 +342,242 @@ export function CareerTreeCanvas({
   );
 }
 
-interface CareerTreePanelProps {
-  data: CareerTree;
-  selectedNode: TreeNode | null;
+function BranchDetail({
+  branch,
+  insight,
+  insightsLoading,
+  takingBranch,
+  onTakeBranch,
+}: {
+  branch: TreeBranchNode;
+  insight?: SegmentInsight;
+  insightsLoading?: boolean;
   takingBranch?: boolean;
   onTakeBranch: (branch: TreeBranchNode) => void;
-  onOpenSegment: (segment: SegmentKey, returnMode?: string) => void;
+}) {
+  const isBundle = branch.branch_type === "bundle" || (branch.skills?.length ?? 0) > 1;
+
+  return (
+    <div className="tree-node-detail">
+      <p className="tree-node-detail__eyebrow">
+        {isBundle ? "Pakiet kompetencji" : "Gałąź rozwoju"}
+      </p>
+      <h3 className="tree-node-detail__title">{branch.title}</h3>
+      <p className="tree-node-detail__segment">{branch.segment_label}</p>
+
+      {isBundle && branch.skills && branch.skills.length > 0 && (
+        <div className="tree-skill-list">
+          <span className="tree-skill-list__label">Skille w pakiecie</span>
+          <div className="chips-row">
+            {branch.skills.map((s) => (
+              <Chip key={String(s.id)} label={s.name} variant="ok" />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <MatchMeter
+        before={branch.match_before}
+        after={branch.match_after}
+        delta={branch.match_delta}
+      />
+
+      {!isBundle && (
+        <p className="tree-node-detail__skill-meta">
+          Skill występuje w <strong>{branch.pct_of_segment ?? "—"}%</strong> ofert tego segmentu.
+        </p>
+      )}
+
+      {isBundle && (
+        <p className="tree-node-detail__skill-meta">
+          Pakiet dodaje <strong>{branch.skills?.length ?? 3} kompetencje</strong> naraz — TF-IDF
+          rośnie wyraźniej niż po pojedynczym skillu.
+        </p>
+      )}
+
+      {insightsLoading && !insight && (
+        <p className="muted tree-insight-loading">Ładuję wynagrodzenia…</p>
+      )}
+
+      <SegmentInsightBlock
+        label="Wynagrodzenia w segmencie"
+        matchPct={branch.match_after}
+        insight={insight ?? branch.segment_insight}
+      />
+
+
+      {branch.status === "available" && (
+        <button
+          type="button"
+          className="btn-primary roadmap-detail__cta"
+          disabled={takingBranch}
+          onClick={() => onTakeBranch(branch)}
+        >
+          {takingBranch
+            ? "Odblokowuję…"
+            : isBundle
+              ? "Uczę się — dodaj pakiet i rozwiń drzewo"
+              : "Uczę się — dodaj skill i rozwiń drzewo"}
+        </button>
+      )}
+
+      {branch.status === "completed" && (
+        <p className="roadmap-detail__hint roadmap-detail__hint--ok">
+          Ten krok masz już za sobą.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function StateDetail({
+  state,
+  segmentInsights,
+  insightsLoading,
+}: {
+  state: TreeStateNode;
+  segmentInsights: Record<string, SegmentInsight>;
+  insightsLoading?: boolean;
+}) {
+  return (
+    <div className="tree-node-detail">
+      <p className="tree-node-detail__eyebrow">Twój aktualny stan</p>
+      <h3 className="tree-node-detail__title">{state.title}</h3>
+      <p className="tree-node-detail__segment">{state.subtitle}</p>
+
+      {state.skills.length > 0 ? (
+        <div className="tree-skill-list">
+          <span className="tree-skill-list__label">Twoje kompetencje</span>
+          <div className="chips-row">
+            {state.skills.map((s: Skill) => (
+              <Chip key={String(s.id)} label={s.name} variant="ok" />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <p className="roadmap-detail__hint muted">
+          Wybierz gałąź ze skilliem, aby zacząć budować profil.
+        </p>
+      )}
+
+      {insightsLoading && state.top_segments.length > 0 && (
+        <p className="muted tree-insight-loading">Ładuję wynagrodzenia segmentów…</p>
+      )}
+
+      {state.top_segments.length > 0 && (
+        <div className="tree-segment-stack">
+          <span className="tree-skill-list__label">Twoje najlepsze segmenty</span>
+          {state.top_segments.map((seg: TreeSegmentSummary) => {
+            const key = segmentInsightKey(seg.lead_main_category, seg.lead_sub_category);
+            const insight = segmentInsights[key] ?? seg.segment_insight;
+            return (
+              <div key={key} className="tree-segment-card">
+                <div className="tree-segment-card__head">
+                  <strong>{seg.display_label}</strong>
+                  <span className="tree-segment-card__match">{seg.match_pct}%</span>
+                </div>
+                <SegmentInsightBlock label="" insight={insight} />
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function CareerComparisonSection({
+  data,
+  segmentInsights,
+  insightsLoading,
+  selectedNode,
+}: {
+  data: CareerTree;
+  segmentInsights: Record<string, SegmentInsight>;
+  insightsLoading?: boolean;
+  selectedNode: TreeNode | null;
+}) {
+  const branches = data.branch_comparison;
+  if (!branches.length) return null;
+
+  const selectedNodeKey =
+    selectedNode?.kind === "branch"
+      ? segmentInsightKey(
+          (selectedNode as TreeBranchNode).lead_main_category,
+          (selectedNode as TreeBranchNode).lead_sub_category
+        )
+      : null;
+
+  return (
+    <CareerOptionMatrix
+      branches={branches}
+      insights={segmentInsights}
+      loading={insightsLoading}
+      selectedNodeKey={selectedNodeKey}
+    />
+  );
 }
 
 export function CareerTreePanel({
   data,
   selectedNode,
+  segmentInsights,
+  insightsLoading,
   takingBranch,
   onTakeBranch,
-  onOpenSegment,
-}: CareerTreePanelProps) {
+}: {
+  data: CareerTree;
+  selectedNode: TreeNode | null;
+  segmentInsights: Record<string, SegmentInsight>;
+  insightsLoading?: boolean;
+  takingBranch?: boolean;
+  onTakeBranch: (branch: TreeBranchNode) => void;
+}) {
   const active =
-    selectedNode ||
-    data.levels[data.levels.length - 1]?.state ||
-    null;
+    selectedNode || data.levels[data.levels.length - 1]?.state || null;
 
-  const activeState =
-    active?.kind === "state" ? (active as TreeStateNode) : null;
-  const activeBranch =
-    active?.kind === "branch" ? (active as TreeBranchNode) : null;
+  const activeState = active?.kind === "state" ? (active as TreeStateNode) : null;
+  const activeBranch = active?.kind === "branch" ? (active as TreeBranchNode) : null;
 
-  const currentLevel = data.levels[data.levels.length - 1];
+  const branchInsight = activeBranch
+    ? segmentInsights[
+        segmentInsightKey(activeBranch.lead_main_category, activeBranch.lead_sub_category)
+      ]
+    : undefined;
 
   return (
-    <aside className="roadmap-sidebar panel">
-      <p className="roadmap-sidebar__eyebrow">Dynamiczne drzewko TF-IDF</p>
-      <h2 className="roadmap-sidebar__title">{data.title}</h2>
-      <p className="roadmap-sidebar__sub">{data.subtitle}</p>
+    <aside className="roadmap-sidebar panel tree-inspector">
+      <p className="roadmap-sidebar__eyebrow">Szczegóły kroku</p>
+      <h2 className="roadmap-sidebar__title">Kliknij klocek na mapie</h2>
+      <p className="roadmap-sidebar__sub">
+        Zobacz wzrost dopasowania i mediany wynagrodzeń Junior / Mid / Senior — bez
+        przechodzenia na inne strony.
+      </p>
 
-      <div className="roadmap-sidebar__stats">
-        <div>
-          <span className="roadmap-sidebar__stat-label">Kompetencje</span>
-          <strong>{data.total_skills}</strong>
-        </div>
-        <div>
-          <span className="roadmap-sidebar__stat-label">Najlepszy segment</span>
-          <strong>{data.best_segment?.match_pct ?? 0}%</strong>
-        </div>
-      </div>
-
-      <ul className="roadmap-features">
-        <li>
-          <strong>Twój stan</strong>
-          <span>Kliknij węzeł „Twój stan”, aby zobaczyć aktualne kompetencje i dopasowanie.</span>
-        </li>
-        <li>
-          <strong>Gałęzie ze skillami</strong>
-          <span>Każda gałąź to konkretny skill — dodanie go podnosi matching do segmentu (TF-IDF).</span>
-        </li>
-        <li>
-          <strong>Rozwój w dół</strong>
-          <span>Po wyborze ścieżki drzewo generuje się na nowo z kolejnymi opcjami.</span>
-        </li>
-      </ul>
+      {!selectedNode && (
+        <p className="roadmap-sidebar__footnote muted">
+          {data.levels[data.levels.length - 1]?.branches.length ?? 0} dostępnych ścieżek
+        </p>
+      )}
 
       {activeState && (
-        <div className="roadmap-detail">
-          <h3>{activeState.title}</h3>
-          <p>{activeState.subtitle}</p>
-
-          {activeState.skills.length > 0 ? (
-            <div className="tree-skill-list">
-              <span className="tree-skill-list__label">Twoje kompetencje</span>
-              <div className="chips-row">
-                {activeState.skills.map((s) => (
-                  <Chip key={String(s.id)} label={s.name} variant="ok" />
-                ))}
-              </div>
-            </div>
-          ) : (
-            <p className="roadmap-detail__hint muted">
-              Brak skilli — wybierz pierwszą gałąź, aby zacząć budować profil.
-            </p>
-          )}
-
-          {activeState.top_segments.length > 0 && (
-            <div className="tree-segment-list">
-              <span className="tree-skill-list__label">Top segmenty (TF-IDF)</span>
-              <ul>
-                {activeState.top_segments.map((seg) => (
-                  <li key={`${seg.lead_main_category}|${seg.lead_sub_category}`}>
-                    <button
-                      type="button"
-                      className="tree-segment-link"
-                      onClick={() =>
-                        onOpenSegment(
-                          {
-                            lead_main_category: seg.lead_main_category,
-                            lead_sub_category: seg.lead_sub_category,
-                          },
-                          "path"
-                        )
-                      }
-                    >
-                      {seg.display_label}
-                      <span>{seg.match_pct}%</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
+        <StateDetail
+          state={activeState}
+          segmentInsights={segmentInsights}
+          insightsLoading={insightsLoading}
+        />
       )}
-
-      {activeBranch && activeBranch.status === "available" && (
-        <div className="roadmap-detail">
-          <h3>+ {activeBranch.skill_name}</h3>
-          <p>
-            Segment: <strong>{activeBranch.segment_label}</strong>
-          </p>
-          <p className="tree-match-gain">
-            Dopasowanie: {activeBranch.match_before}% →{" "}
-            <strong>{activeBranch.match_after}%</strong>
-            <span className="tree-match-gain__delta"> (+{activeBranch.match_delta}%)</span>
-          </p>
-          <p className="muted" style={{ fontSize: "0.85rem" }}>
-            Skill występuje w {activeBranch.pct_of_segment ?? "—"}% ofert tego segmentu.
-          </p>
-          <button
-            type="button"
-            className="btn-primary roadmap-detail__cta"
-            disabled={takingBranch}
-            onClick={() => onTakeBranch(activeBranch)}
-          >
-            {takingBranch ? "Odblokowuję…" : "Uczę się — dodaj skill i rozwiń drzewo"}
-          </button>
-          <button
-            type="button"
-            className="btn-secondary roadmap-detail__cta"
-            onClick={() =>
-              onOpenSegment(
-                {
-                  lead_main_category: activeBranch.lead_main_category,
-                  lead_sub_category: activeBranch.lead_sub_category,
-                },
-                "path"
-              )
-            }
-          >
-            Zobacz segment rynku
-          </button>
-        </div>
-      )}
-
-      {activeBranch && activeBranch.status === "completed" && (
-        <p className="roadmap-detail__hint roadmap-detail__hint--ok">
-          Tę ścieżkę już przeszedłeś — skill „{activeBranch.skill_name}” jest w profilu.
-        </p>
-      )}
-
-      {!selectedNode && currentLevel?.branches.length > 0 && (
-        <p className="roadmap-sidebar__footnote muted">
-          {currentLevel.branches.length} dostępnych ścieżek — wybierz gałąź ze skilliem.
-        </p>
+      {activeBranch && (
+        <BranchDetail
+          branch={activeBranch}
+          insight={branchInsight}
+          insightsLoading={insightsLoading}
+          takingBranch={takingBranch}
+          onTakeBranch={onTakeBranch}
+        />
       )}
     </aside>
   );
 }
 
-// Keep legacy exports for any stale imports
 export { CareerTreeCanvas as CareerRoadmapCanvas, CareerTreePanel as CareerRoadmapPanel };
