@@ -9,3 +9,4 @@ openai>=1.0.0
 mcp>=1.0.0
 wordcloud==1.9.6
 matplotlib>=3.8.0
+mcp>=1.0.0
