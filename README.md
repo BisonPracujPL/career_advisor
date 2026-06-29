@@ -44,12 +44,12 @@ docker compose exec backend python manage.py test_skill_similarity --count 5
 Aby aplikacja posiadała wszystkie oferty z polskiego rynku pracy oraz poprawnie przetłumaczony słownik umiejętności (LightCast), należy zresetować bazę danych i załadować nowe pliki.
 
 ### 1. Skąd pobrać pliki z danymi?
-Pliki z danymi są zbyt duże, aby przechowywać je w repozytorium kodu. Zanim zaczniesz, upewnij się, że masz je w głównym folderze projektu:
+Pliki z danymi są zbyt duże, aby przechowywać je w repozytorium kodu. Można je wziąć z:
 
 1. **Polski słownik LightCast** – wejdź na https://github.com/BisonPracujPL/OJD-DAPS-skills-polish- i pobierz stamtąd dwa pliki: `lightcast_data_formatted.csv` oraz `lightcast_hier_mapper.json`.
 2. **Przetworzona baza ofert** – pobierz gotowy plik z ofertami i wygenerowanymi polskimi skillami (plik `data_en_processed.csv` polskiej wersji) z dysku: https://drive.google.com/file/d/1Hr4ZmL3h2_w9a1Zaf9v5jrcYGya4EQxA/view?usp=sharing.
 
-*Wszystkie trzy pliki wrzuć luzem do głównego folderu projektu.*
+*Wszystkie trzy pliki do głównego folderu projektu.*
 
 ### 2. Reset i przebudowa środowiska
 Zatrzymaj kontenery i bezwarunkowo usuń stary wolumen bazy danych, aby pozbyć się starych ofert:
