@@ -10,7 +10,7 @@ print("KROK 1: Ładowanie słownika LightCast...")
 keyword_processor = KeywordProcessor(case_sensitive=False)
 
 # Wczytujemy słownik skilli
-with open("lightcast_data_formatted.csv", "r", encoding="utf-8") as f:
+with open("lightcast_pl_data_formatted.csv", "r", encoding="utf-8") as f:
     reader = csv.DictReader(f)
     skills_count = 0
     for row in reader:
