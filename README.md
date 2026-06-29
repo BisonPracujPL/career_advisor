@@ -46,7 +46,7 @@ Aby aplikacja posiadała wszystkie oferty z polskiego rynku pracy oraz poprawnie
 ### 1. Skąd pobrać pliki z danymi?
 Pliki z danymi są zbyt duże, aby przechowywać je w repozytorium kodu. Można je wziąć z:
 
-1. **Polski słownik LightCast** – wejdź na https://github.com/BisonPracujPL/OJD-DAPS-skills-polish- i pobierz stamtąd dwa pliki: `lightcast_data_formatted.csv` oraz `lightcast_hier_mapper.json`.
+1. **Polski słownik LightCast** – wejdź na https://github.com/BisonPracujPL/OJD-DAPS-skills-polish- i pobierz stamtąd dwa pliki (znajdują się w folderze `ojd_daps_skills/data`): `lightcast_pl_data_formatted.csv` oraz `lightcast_pl_hier_mapper.json` i zapisz pod nazwami `lightcast_data_formatted.csv` oraz  `lightcast_hier_mapper.json`.
 2. **Przetworzona baza ofert** – pobierz gotowy plik z ofertami i wygenerowanymi polskimi skillami (plik `data_en_processed.csv` polskiej wersji) z dysku: https://drive.google.com/file/d/1Hr4ZmL3h2_w9a1Zaf9v5jrcYGya4EQxA/view?usp=sharing.
 
 *Wszystkie trzy pliki do głównego folderu projektu.*
