@@ -56,10 +56,15 @@ Zatrzymaj kontenery i bezwarunkowo usuń stary wolumen bazy danych, aby pozbyć 
 
 ```bash
 docker compose down -v
+```
+```bash
 docker compose up -d --build
+```
 
 Następnie zbuduj tabele w bazie:
+```bash
 docker compose exec backend python manage.py migrate
+```
 
 ### 3. Wgrywanie danych
 
@@ -69,15 +74,22 @@ A. Słownik umiejętności (LightCast):
 
 ```bash
 docker compose exec backend python manage.py load_skills /data/lightcast_data_formatted.csv /data/lightcast_hier_mapper.json
+```
 
 B. Baza ofert pracy:
 
 ```bash
 docker compose exec -e DEBUG=False backend python manage.py load_offers /data/data_en_processed.csv --threshold 0.5
+```
 
 C. Wektory i TD-IDF:
 
 ```bash
 docker compose exec -e DEBUG=False backend python manage.py compute_skill_idf
+```
+```bash
 docker compose exec -e DEBUG=False backend python manage.py build_skill_vectors --vector-value tfidf
+```
+```bash
 docker compose exec -e DEBUG=False backend python manage.py embed_offers
+```
