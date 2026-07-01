@@ -9,7 +9,7 @@
     "id": "salary_trend_role",
     "short_desc": "Zarobki wg doświadczenia: [Stanowisko]",
     "prompt": "Użyj narzędzia AntV MCP, aby wygenerować wykres słupkowy (Bar Chart) porównujący średnie wynagrodzenia na stanowisku [Stanowisko]. Na osi X umieść poziomy doświadczenia: Junior, Mid, Senior. Na osi Y wartości w PLN (oszacuj realistyczne rynkowe stawki). Pod wykresem napisz krótko, ile lat średnio zajmuje przejście między tymi szczeblami.",
-    "icon": "bar-chart-2"
+    "icon": "bar-chart"
   },
   {
     "id": "skill_gap",
@@ -26,7 +26,7 @@
   {
     "id": "demand_chart",
     "short_desc": "Top 5 skilli na [Stanowisko]",
-    "prompt": "Użyj narzędzia AntV MCP, aby wygenerować wykres kołowy (Pie Chart) pokazujący udział 5 najpopularniejszych narzędzi/technologii wymaganych w obecnych ofertach pracy dla [Stanowisko]. Przygotuj realistyczne dane procentowe sumujące się do 100%. Podsumuj w jednym zdaniu, z czego warto zrobić pierwszy certyfikat.",
-    "icon": "pie-chart"
+    "prompt": "Użyj narzędzia AntV MCP, aby wygenerować wykres słupkowy (Bar Chart) pokazujący udział 5 najpopularniejszych narzędzi/technologii wymaganych w obecnych ofertach pracy dla [Stanowisko]. Przygotuj realistyczne dane (np. liczba ofert lub udział w procentach). Podsumuj w jednym zdaniu, z czego warto zrobić pierwszy certyfikat.",
+    "icon": "bar-chart"
   }
 ]

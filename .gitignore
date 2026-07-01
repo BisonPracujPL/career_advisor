@@ -17,3 +17,7 @@ staticfiles/
 # Frontend
 frontend/node_modules/
 frontend/dist/
+
+# Final rag
+final_rag.zip
+final_rag_pdfs/

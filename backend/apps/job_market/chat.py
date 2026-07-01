@@ -7,12 +7,23 @@ from django.views.decorators.csrf import csrf_exempt
 from mcp.client.stdio import stdio_client, StdioServerParameters
 from mcp.client.session import ClientSession
 
+from apps.job_market.services.career_chat_context import (
+    CHAT_COURSE_INSTRUCTIONS,
+    build_chat_career_context,
+    format_chat_context_block,
+)
+from apps.job_market.services.rag_service import retrieve_context
+
 SERVER_PARAMS = StdioServerParameters(
     command="mcp-server-chart",
     args=[]
 )
 
 AI_MODEL = "openai/gpt-4o-mini"
+
+# Lower temperature → less hallucination, more factual / grounded answers.
+AI_TEMPERATURE = 0.2
+
 
 def get_user_profile_sync(user):
     if not user.is_authenticated:
@@ -22,6 +33,7 @@ def get_user_profile_sync(user):
         return profile.profile_data if profile else {}
     except Exception:
         return {}
+
 
 async def _fetch_mcp_tools():
     """Connect to the MCP chart stdio server and return OpenAI-formatted tools list."""
@@ -41,6 +53,7 @@ async def _fetch_mcp_tools():
                 for t in tools_resp.tools
             ]
 
+
 async def _call_mcp_tool(tool_name: str, arguments: dict) -> str:
     """Call a single MCP chart tool and return its text result."""
     async with stdio_client(SERVER_PARAMS) as (read, write):
@@ -49,7 +62,9 @@ async def _call_mcp_tool(tool_name: str, arguments: dict) -> str:
             result = await session.call_tool(tool_name, arguments=arguments)
             return result.content[0].text if result.content else ""
 
+
 from rest_framework.authentication import TokenAuthentication
+
 
 @csrf_exempt
 def chat_api(request):
@@ -73,18 +88,44 @@ def chat_api(request):
         messages = [{"role": "user", "content": "Hello"}]
 
     profile_data = get_user_profile_sync(request.user)
+    if body.get("profile_override") and isinstance(body["profile_override"], dict):
+        profile_data = {**profile_data, **body["profile_override"]}
+
+    market_ctx = build_chat_career_context(profile_data)
+    context_block = format_chat_context_block(profile_data, market_ctx)
+
+    # ── RAG: retrieve grounding context from indexed market reports ────────────
+    # Use the last user message as the retrieval query for best relevance.
+    rag_query = ""
+    for m in reversed(messages):
+        if m.get("role") == "user" and m.get("content"):
+            rag_query = m["content"]
+            break
+
+    rag_context = retrieve_context(rag_query) if rag_query else ""
+    rag_section = f"\n\n{rag_context}" if rag_context else ""
+    import sys
+    print(f"RAG Query: {rag_query!r}", file=sys.stderr)
+    print(f"RAG Section length: {len(rag_section)}", file=sys.stderr)
+    # ──────────────────────────────────────────────────────────────────────────
 
     system_prompt = {
         "role": "system",
         "content": (
-            "You are a personalized AI career advisor. Respond in Polish. "
-            "Be concise, practical, and encouraging. "
-            f"Here is the detailed user profile data (in JSON format): {json.dumps(profile_data, ensure_ascii=False)}. "
-            "You must use this profile information whenever the user asks about themselves, their background, skills, or what you know about them. "
-            "Give specific, actionable career advice based on their profile. "
-            "Use markdown for structure (bullet points, bold text). "
-            "When the user asks for a chart or visualization, use the available chart tools. "
-            "After generating a chart, embed the result as a Markdown image so it displays inline."
+            "You are a personalized AI career advisor for the Polish job market. "
+            "Respond in Polish. Be concise, practical, and encouraging.\n\n"
+            f"User profile (JSON): {json.dumps(profile_data, ensure_ascii=False)}\n\n"
+            f"{context_block}\n\n"
+            f"{rag_section}\n\n"
+            "CRITICAL INSTRUCTIONS FOR RAG:\n"
+            "1. When answering questions about the job market, salaries, or trends, YOU MUST BASE YOUR ANSWER ENTIRELY ON THE 'Dokumenty źródłowe' provided above.\n"
+            "2. DO NOT hallucinate or make up salary bands (e.g. Junior/Mid) if they are not explicitly present in the provided reports.\n"
+            "3. If the reports only mention 'Senior', state clearly that you only have data for Senior roles.\n"
+            "4. Always cite the specific report name (e.g., 'Według raportu Antal...').\n\n"
+            f"{CHAT_COURSE_INSTRUCTIONS}\n\n"
+            "Use the profile and market context whenever the user asks about themselves, "
+            "skills, career path, courses, or trends. "
+            "When the user asks for a chart, use available chart tools and embed results as Markdown images."
         ),
     }
     full_messages = [system_prompt] + list(messages)
@@ -107,7 +148,7 @@ def chat_api(request):
         tools = []
         try:
             tools = asyncio.run(_fetch_mcp_tools())
-        except Exception as e:
+        except Exception:
             # Silently proceed without tools if MCP fails
             pass
 
@@ -116,6 +157,7 @@ def chat_api(request):
                 "model": AI_MODEL,
                 "messages": full_messages,
                 "max_tokens": 1500,
+                "temperature": AI_TEMPERATURE,
             }
             if tools:
                 first_call_kwargs["tools"] = tools
@@ -175,6 +217,7 @@ def chat_api(request):
                     messages=tool_messages,
                     stream=True,
                     max_tokens=1500,
+                    temperature=AI_TEMPERATURE,
                 )
                 for chunk in stream:
                     if not chunk.choices:
@@ -189,6 +232,7 @@ def chat_api(request):
                     messages=full_messages,
                     stream=True,
                     max_tokens=1500,
+                    temperature=AI_TEMPERATURE,
                 )
                 for chunk in stream:
                     if not chunk.choices:

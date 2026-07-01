@@ -18,6 +18,8 @@ interface Suggestion {
   icon: string;
 }
 
+const SESSION_KEY = 'chat_advisor_messages';
+
 const SuggestionIcon = ({ name }: { name: string }) => {
   switch (name) {
     case 'bar-chart':
@@ -41,8 +43,28 @@ const SuggestionIcon = ({ name }: { name: string }) => {
   }
 };
 
+/** Load messages persisted in sessionStorage (survives page refresh, not new tab). */
+function loadPersistedMessages(): ChatMessage[] {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as ChatMessage[];
+  } catch {
+    return [];
+  }
+}
+
+/** Save messages to sessionStorage. */
+function persistMessages(messages: ChatMessage[]): void {
+  try {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(messages));
+  } catch {
+    // sessionStorage full or unavailable — silently ignore.
+  }
+}
+
 export function ChatAdvisor() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => loadPersistedMessages());
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +79,11 @@ export function ChatAdvisor() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isLoading]);
+
+  // Persist messages to sessionStorage whenever they change.
+  useEffect(() => {
+    persistMessages(messages);
+  }, [messages]);
 
   const fetchSuggestions = useCallback(async (currentMessages: ChatMessage[]) => {
     try {
@@ -89,6 +116,18 @@ export function ChatAdvisor() {
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
     }
   }, [inputValue]);
+
+  /** Clear conversation — both state and sessionStorage. */
+  const handleNewConversation = useCallback(() => {
+    setMessages([]);
+    setSuggestions([]);
+    setError(null);
+    try {
+      sessionStorage.removeItem(SESSION_KEY);
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const sendMessage = useCallback(async (text: string, displayContent?: string, icon?: string) => {
     const trimmed = text.trim();
@@ -207,6 +246,24 @@ export function ChatAdvisor() {
         </div>
       ) : (
         <div className="chat-messages">
+          {/* ── "Nowa rozmowa" header bar ── */}
+          <div className="chat-thread-header">
+            <span className="chat-thread-title">Rozmowa z doradcą</span>
+            <button
+              id="new-conversation-btn"
+              className="chat-new-conversation-btn"
+              onClick={handleNewConversation}
+              disabled={isLoading}
+              title="Wyczyść rozmowę i zacznij od nowa"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="1 4 1 10 7 10"></polyline>
+                <path d="M3.51 15a9 9 0 1 0 .49-3.51"></path>
+              </svg>
+              <span>Nowa rozmowa</span>
+            </button>
+          </div>
+
           <div className="chat-messages-inner">
             {messages.map((m) => (
               <div key={m.id} className={`chat-message-row ${m.role}`}>

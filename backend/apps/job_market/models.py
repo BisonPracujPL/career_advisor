@@ -231,3 +231,38 @@ class UserProfile(models.Model):
 
     def __str__(self) -> str:
         return f"Profile for {self.user.username}"
+
+
+class RagChunk(models.Model):
+    """A text chunk from a PDF market report, stored with a dense embedding
+    for cosine-similarity retrieval (RAG).
+
+    Embedding model: paraphrase-multilingual-MiniLM-L12-v2 → 384 dimensions.
+    One row per chunk. Source is the PDF filename stem (without .pdf extension).
+    """
+
+    source = models.CharField(
+        max_length=255,
+        db_index=True,
+        help_text="PDF filename stem (without .pdf), e.g. 'Hays-Poland_Raport-placowy-2026'",
+    )
+    chunk_idx = models.PositiveIntegerField(
+        help_text="Position of this chunk within its source document (0-based).",
+    )
+    text = models.TextField(help_text="Raw extracted text content of the chunk.")
+    embedding = VectorField(
+        dimensions=384,
+        null=True,
+        blank=True,
+        help_text="Embedding from paraphrase-multilingual-MiniLM-L12-v2 (384-dim).",
+    )
+
+    class Meta:
+        db_table = "rag_chunks"
+        unique_together = [("source", "chunk_idx")]
+        indexes = [
+            models.Index(fields=["source"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.source} [{self.chunk_idx}]"
