@@ -6,6 +6,7 @@ import { Navbar } from "./components/Navbar";
 import { MultiSelect, Collapse, Chip } from "./components/ui";
 import { OfferCard } from "./components/OfferCard";
 import { ChatAdvisor } from "./components/ChatAdvisor";
+import { CareerPathView } from "./career/CareerPathView";
 import { OfferDetailView } from "./explore/OfferDetailView";
 import { SegmentAnalyticsView } from "./explore/SegmentAnalyticsView";
 import {
@@ -17,6 +18,7 @@ import {
   OfferDetail,
   SegmentAnalytics,
   SegmentKey,
+  CareerPathStep,
 } from "./types";
 
 export default function App() {
@@ -187,6 +189,59 @@ export default function App() {
         .filter((id) => id && id !== "undefined"),
     [selectedSkills]
   );
+
+  const takeCareerBranch = useCallback(
+    async (skills: Skill[], step: CareerPathStep) => {
+      setSelectedSkills((prev) => {
+        let next = [...prev];
+        for (const skill of skills) {
+          if (!next.some((s) => String(s.id) === String(skill.id))) {
+            next = [...next, skill];
+          }
+        }
+        return next;
+      });
+      const base: UserProfile = profileData || {
+        experience: [],
+        education: [],
+        hard_skills: [],
+        languages: [],
+        interested_industries: [],
+      };
+      let hard_skills = [...(base.hard_skills || [])];
+      for (const skill of skills) {
+        if (!hard_skills.some((s) => String(s.id) === String(skill.id))) {
+          hard_skills = [...hard_skills, skill];
+        }
+      }
+      const prevSteps = base.career_path?.steps || [];
+      const nextProfile: UserProfile = {
+        ...base,
+        hard_skills,
+        career_path: {
+          ...base.career_path,
+          steps: [...prevSteps, step],
+        },
+      };
+      const data = await api.saveProfile(nextProfile);
+      setProfileData(data.profile_data);
+      setHasProfile(true);
+    },
+    [profileData]
+  );
+
+  const resetCareerPath = useCallback(async () => {
+    const base: UserProfile = profileData || {
+      experience: [],
+      education: [],
+      hard_skills: selectedSkills,
+      languages: [],
+      interested_industries: [],
+    };
+    const next = { ...base, career_path: { ...base.career_path, steps: [] } };
+    const data = await api.saveProfile(next);
+    setProfileData(data.profile_data);
+  }, [profileData, selectedSkills]);
 
   const resetExplore = () => {
     setExploreView("results");
@@ -513,6 +568,14 @@ export default function App() {
 
       {mode === "chat" ? (
         <ChatAdvisor />
+      ) : mode === "path" ? (
+        <CareerPathView
+          profileData={profileData}
+          selectedSkills={selectedSkills}
+          onEditProfile={() => setShowProfileWizard(true)}
+          onTakeBranch={takeCareerBranch}
+          onResetPath={resetCareerPath}
+        />
       ) : (
         <div className="app">
           {!isProfileLoading && isLoggedIn && !hasProfile && (

@@ -86,6 +86,48 @@ class SkillSubcategoriesView(APIView):
         )
 
 
+class SkillResolveView(APIView):
+    """Fill LightCast skill ids for profile entries saved with name only."""
+
+    def post(self, request):
+        items = request.data.get("skills") or []
+        out = []
+        updated = False
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            name = (item.get("name") or "").strip()
+            sid = item.get("id")
+            if sid:
+                out.append(
+                    {
+                        "id": str(sid),
+                        "name": name
+                        or Skill.objects.filter(id=sid).values_list("name", flat=True).first()
+                        or str(sid),
+                        "main_category": item.get("main_category"),
+                        "subcategory": item.get("subcategory"),
+                    }
+                )
+                continue
+            if not name:
+                continue
+            row = Skill.objects.filter(is_category=False, name__iexact=name).first()
+            if row:
+                updated = True
+                out.append(
+                    {
+                        "id": row.id,
+                        "name": row.name,
+                        "main_category": row.main_category,
+                        "subcategory": row.subcategory,
+                    }
+                )
+            else:
+                out.append(item)
+        return Response({"skills": out, "updated": updated})
+
+
 class SkillBrowseView(APIView):
     def get(self, request):
         main_code = request.query_params.get("main_category_code")
@@ -610,3 +652,76 @@ class SegmentAnalyticsView(APIView):
         if analytics is None:
             return Response({"detail": "Brak ofert w tym segmencie."}, status=status.HTTP_404_NOT_FOUND)
         return Response(analytics)
+
+
+class SegmentRankingView(APIView):
+    """Rank market segments by fit with the user's skill profile."""
+
+    def post(self, request):
+        from apps.job_market.services.segment_ranking import rank_segments_for_profile
+
+        skill_ids = request.data.get("skill_ids") or []
+        if not skill_ids:
+            return Response(
+                {"detail": "Wybierz co najmniej jeden skill."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        limit = min(int(request.data.get("limit", 15)), 30)
+        industries = request.data.get("interested_industries")
+        segments = rank_segments_for_profile(skill_ids, industries, limit)
+        return Response({"segments": segments, "count": len(segments)})
+
+
+class CareerRoadmapView(APIView):
+    """Dynamic TF-IDF skill tree — branches show real match gains toward segments."""
+
+    def post(self, request):
+        from apps.job_market.services.career_tree import build_career_tree
+
+        skill_ids = request.data.get("skill_ids") or []
+        industries = request.data.get("interested_industries")
+        career_path = request.data.get("career_path") or {}
+        experience = request.data.get("experience") or []
+        tree = build_career_tree(skill_ids, industries, career_path, experience=experience)
+        if tree is None:
+            return Response(
+                {"detail": "Brak danych do wygenerowania ścieżki kariery."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(tree)
+
+
+class CareerSegmentInsightsView(APIView):
+    """Batch salary / level insight for career-path segments (lazy-loaded)."""
+
+    def post(self, request):
+        from apps.job_market.services.career_tree import batch_segment_insights
+
+        segments = request.data.get("segments") or []
+        if not segments:
+            return Response({"insights": {}})
+        return Response({"insights": batch_segment_insights(segments)})
+
+
+class CareerBranchVisionView(APIView):
+    """One-shot AI vision + course links for a career tree branch (not the main chat)."""
+
+    def post(self, request):
+        from apps.job_market.services.career_branch_vision import generate_branch_vision
+
+        branch = request.data.get("branch")
+        if not branch or not isinstance(branch, dict):
+            return Response(
+                {"error": "branch (object) is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        profile_data = request.data.get("profile_override")
+        if profile_data is None and request.user.is_authenticated:
+            profile_data = request.user.profile_data or {}
+
+        segment_insight = request.data.get("segment_insight")
+        result = generate_branch_vision(branch, profile_data, segment_insight)
+        if result.get("error") and not result.get("content"):
+            return Response(result, status=status.HTTP_502_BAD_GATEWAY)
+        return Response(result)

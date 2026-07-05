@@ -12,6 +12,7 @@ urlpatterns = [
         views.SkillSubcategoriesView.as_view(),
     ),
     path("skills/browse/", views.SkillBrowseView.as_view()),
+    path("skills/resolve/", views.SkillResolveView.as_view()),
     path("market/pillars/", views.MarketPillarsView.as_view()),
     path(
         "market/pillars/<str:pillar_id>/segments/",
@@ -23,6 +24,13 @@ urlpatterns = [
     path("offers/search/", views.OfferSearchView.as_view()),
     path("offers/<int:offer_id>/", views.OfferDetailView.as_view()),
     path("market/segments/analytics/", views.SegmentAnalyticsView.as_view()),
+    path("market/segments/rank/", views.SegmentRankingView.as_view()),
+    path("market/career-roadmap/", views.CareerRoadmapView.as_view()),
+    path("market/career-roadmap/insights/", views.CareerSegmentInsightsView.as_view()),
+    path(
+        "market/career-roadmap/branch-vision/",
+        views.CareerBranchVisionView.as_view(),
+    ),
     path("offers/categories/", views.OfferCategoriesView.as_view()),
     path(
         "offers/categories/<str:main_cat>/subcategories/",

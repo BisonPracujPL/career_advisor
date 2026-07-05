@@ -1,4 +1,4 @@
-import { Filters } from "./types";
+import { Filters, SegmentInsight } from "./types";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -53,6 +53,11 @@ export const api = {
   filterOptions: (): Promise<any> => request("/api/v1/filters/options/"),
   searchSkills: (q: string): Promise<any> =>
     request(`/api/v1/skills/search/?q=${encodeURIComponent(q)}&limit=20`),
+  resolveProfileSkills: (skills: { id?: string; name: string }[]): Promise<{ skills: any[]; updated: boolean }> =>
+    request("/api/v1/skills/resolve/", {
+      method: "POST",
+      body: JSON.stringify({ skills }),
+    }),
   recommendSkills: (skills: string[]): Promise<any> =>
     request("/api/v1/skills/recommend/", {
       method: "POST",
@@ -114,5 +119,49 @@ export const api = {
         region_name: filters.region_name || "",
         position_level_groups: filters.position_level_groups || [],
       }),
+    }),
+  rankCareerSegments: (
+    skillIds: string[],
+    interestedIndustries: unknown[] = [],
+    limit = 15
+  ): Promise<any> =>
+    request("/api/v1/market/segments/rank/", {
+      method: "POST",
+      body: JSON.stringify({
+        skill_ids: skillIds,
+        interested_industries: interestedIndustries,
+        limit,
+      }),
+    }),
+  getCareerRoadmap: (
+    skillIds: string[],
+    interestedIndustries: unknown[] = [],
+    careerPath: Record<string, unknown> = {},
+    experience: unknown[] = []
+  ): Promise<any> =>
+    request("/api/v1/market/career-roadmap/", {
+      method: "POST",
+      body: JSON.stringify({
+        skill_ids: skillIds,
+        interested_industries: interestedIndustries,
+        career_path: careerPath,
+        experience,
+      }),
+    }),
+  getCareerInsights: (
+    segments: { lead_main_category: string; lead_sub_category: string }[]
+  ): Promise<{ insights: Record<string, SegmentInsight> }> =>
+    request("/api/v1/market/career-roadmap/insights/", {
+      method: "POST",
+      body: JSON.stringify({ segments }),
+    }),
+  getCareerBranchVision: (payload: {
+    branch: Record<string, unknown>;
+    profile_override?: Record<string, unknown>;
+    segment_insight?: Record<string, unknown>;
+  }): Promise<{ content: string; error?: string | null }> =>
+    request("/api/v1/market/career-roadmap/branch-vision/", {
+      method: "POST",
+      body: JSON.stringify(payload),
     }),
 };
