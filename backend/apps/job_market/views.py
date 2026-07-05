@@ -3,12 +3,16 @@ from django.db.models import Count
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from pgvector.django import CosineDistance
-from sentence_transformers import SentenceTransformer
 
 from apps.job_market.constants import MARKET_PILLARS, PILLAR_IDS, POSITION_LEVEL_GROUPS
 from apps.job_market.models import JobOffer, Skill
 from apps.job_market.services import matching
+from apps.job_market.services.text_embedding_matching import (
+    get_embedding_encoder,
+    match_profile_semantic,
+    match_similar_offers_semantic,
+    profile_to_text,
+)
 
 
 class SkillSearchView(APIView):
@@ -309,6 +313,120 @@ class MatchSimilarOffersView(APIView):
         )
 
 
+class MatchByProfileTextView(APIView):
+    """Match offers by semantic similarity of full profile text (SentenceTransformer)."""
+
+    def post(self, request):
+        profile_data = request.data.get("profile_data")
+        if profile_data is None and request.user.is_authenticated:
+            try:
+                profile = getattr(request.user, "profile", None)
+                profile_data = profile.profile_data if profile else {}
+            except Exception:
+                profile_data = {}
+        if not profile_data:
+            profile_data = {}
+
+        skill_ids = request.data.get("skill_ids") or []
+        filters = request.data.get("filters") or {}
+        limit = min(int(request.data.get("limit", 20)), 50)
+
+        try:
+            profile_text, results = match_profile_semantic(
+                profile_data,
+                filters=filters,
+                limit=limit,
+                user_skill_ids=list(skill_ids) if skill_ids else None,
+            )
+        except Exception as exc:
+            return Response(
+                {"detail": f"Dopasowanie semantyczne niedostępne: {exc}"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        if not results:
+            return Response(
+                {
+                    "detail": (
+                        "Brak ofert z embeddingiem tekstu. Uruchom: python manage.py embed_offers"
+                    ),
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(
+            {
+                "mode": "profile_semantic",
+                "profile_text_used": profile_text,
+                "skill_ids": skill_ids,
+                "count": len(results),
+                "offers": results,
+            }
+        )
+
+
+class MatchSimilarTextView(APIView):
+    """Similar offers by full-text embedding of seed offer (not skill TF-IDF)."""
+
+    def get(self, request):
+        try:
+            offer_id = int(request.query_params["offer_id"])
+        except (KeyError, TypeError, ValueError):
+            return Response(
+                {"detail": "Parametr offer_id jest wymagany."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        filters = {}
+        if request.query_params.get("market_pillar"):
+            filters["market_pillar"] = request.query_params["market_pillar"]
+        if request.query_params.get("region_name"):
+            filters["region_name"] = request.query_params["region_name"]
+        if request.query_params.get("lead_main_category"):
+            filters["lead_main_category"] = request.query_params["lead_main_category"]
+        if request.query_params.get("lead_sub_category"):
+            filters["lead_sub_category"] = request.query_params["lead_sub_category"]
+        groups = request.query_params.getlist("position_level_groups")
+        if groups:
+            filters["position_level_groups"] = groups
+
+        limit = min(int(request.query_params.get("limit", 20)), 50)
+        raw_skills = request.query_params.get("skill_ids", "")
+        user_skill_ids = [s.strip() for s in raw_skills.split(",") if s.strip()]
+
+        try:
+            seed, results = match_similar_offers_semantic(
+                offer_id,
+                filters=filters or None,
+                limit=limit,
+                user_skill_ids=user_skill_ids or None,
+            )
+        except Exception as exc:
+            return Response(
+                {"detail": f"Dopasowanie semantyczne niedostępne: {exc}"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        if seed is None:
+            return Response(
+                {
+                    "detail": (
+                        "Oferta nie ma embeddingu tekstu. Uruchom: python manage.py embed_offers"
+                    ),
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(
+            {
+                "mode": "offer_semantic",
+                "seed": seed,
+                "count": len(results),
+                "offers": results,
+            }
+        )
+
+
 class OfferSearchView(APIView):
     def get(self, request):
         q = request.query_params.get("q", "")
@@ -356,7 +474,7 @@ class OfferSubcategoriesView(APIView):
         )
 
 
-embedding_model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
+embedding_model = get_embedding_encoder()
 
 
 class MatchCandidateJsonView(APIView):
@@ -368,62 +486,57 @@ class MatchCandidateJsonView(APIView):
     def post(self, request):
         candidate_json = request.data
 
-        # 1. Zabezpieczenie przed pustym requestem
         if not candidate_json:
             return Response(
                 {"detail": "Nie podano JSONa kandydata."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # 2. Sklejenie wartości JSONa (Doświadczenie, skille, opis) w jeden tekst
-        # Możesz to dostosować pod konkretne klucze, jakie mają te JSONy.
-        skills = ", ".join(candidate_json.get("skills", []))
-        experience = candidate_json.get("experience", "")
-        summary = candidate_json.get("summary", "")
+        # Legacy flat shape or full UserProfile
+        if candidate_json.get("hard_skills") or candidate_json.get("experience"):
+            profile_data = candidate_json
+        else:
+            profile_data = {
+                "hard_skills": [
+                    {"name": s} for s in (candidate_json.get("skills") or [])
+                ],
+                "experience": (
+                    [{"job_title": candidate_json.get("experience", "")}]
+                    if candidate_json.get("experience")
+                    else []
+                ),
+            }
+            if candidate_json.get("summary"):
+                profile_data.setdefault("education", [])
+                profile_data["_summary"] = candidate_json["summary"]
 
-        candidate_text = (
-            f"Kandydat. Podsumowanie: {summary}. "
-            f"Doświadczenie: {experience}. "
-            f"Umiejętności: {skills}."
-        )
-
-        # 3. Zamiana tekstu kandydata na gęsty wektor (embedding)
-        candidate_vector = embedding_model.encode(candidate_text).tolist()
-
-        # 4. Znajdowanie podobieństwa w bazie PostgreSQL używając pgvector
         limit = int(request.query_params.get("limit", 10))
-
-        # CosineDistance zwraca odległość (im mniejsza tym lepsza).
-        # Cosine Similarity to 1 - CosineDistance.
-        similar_offers = (
-            JobOffer.objects.exclude(full_text_embedding__isnull=True)
-            .annotate(distance=CosineDistance("full_text_embedding", candidate_vector))
-            .order_by("distance")[:limit]
-        )
-
-        # 5. Przygotowanie wyników
-        results = []
-        for offer in similar_offers:
-            similarity = 1.0 - float(
-                offer.distance
-            )  # Zmiana z odległości na % podobieństwa
-            results.append(
-                {
-                    "id": offer.id,
-                    "job_title": offer.job_title,
-                    "lead_main_category": offer.lead_main_category,
-                    "similarity_score": round(
-                        similarity, 3
-                    ),  # Wynik np. 0.852 (czyli ~85%)
-                }
+        try:
+            candidate_text, results = match_profile_semantic(
+                profile_data, limit=limit
             )
+        except Exception as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        offers = [
+            {
+                "id": r["offer_id"],
+                "job_title": r["job_title"],
+                "lead_main_category": r["lead_main_category"],
+                "similarity_score": round(r["similarity"], 3),
+            }
+            for r in results
+        ]
 
         return Response(
             {
                 "mode": "json_full_text_matching",
                 "candidate_text_used": candidate_text,
-                "count": len(results),
-                "offers": results,
+                "count": len(offers),
+                "offers": offers,
             }
         )
 

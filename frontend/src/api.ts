@@ -99,6 +99,35 @@ export const api = {
     );
     return request(`/api/v1/match/similar/?${p}`);
   },
+  matchByProfileText: (body: {
+    profile_data?: Record<string, unknown>;
+    skill_ids?: string[];
+    filters?: Partial<Filters>;
+    limit?: number;
+  }): Promise<any> =>
+    request("/api/v1/match/by-profile-text/", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  matchSimilarText: (
+    offerId: string | number,
+    filters: Partial<Filters>,
+    skillIds: string[] = [],
+    limit = 20
+  ): Promise<any> => {
+    const p = new URLSearchParams({ offer_id: String(offerId), limit: String(limit) });
+    if (filters.region_name) p.set("region_name", filters.region_name);
+    if (filters.market_pillar) p.set("market_pillar", filters.market_pillar);
+    if (filters.lead_main_category)
+      p.set("lead_main_category", filters.lead_main_category);
+    if (filters.lead_sub_category)
+      p.set("lead_sub_category", filters.lead_sub_category);
+    (filters.position_level_groups || []).forEach((g: string) =>
+      p.append("position_level_groups", g)
+    );
+    if (skillIds.length) p.set("skill_ids", skillIds.join(","));
+    return request(`/api/v1/match/similar-text/?${p}`);
+  },
   getOfferDetail: (offerId: string | number, skillIds: string[] = []): Promise<any> =>
     request(`/api/v1/offers/${offerId}/`, {
       method: "POST",

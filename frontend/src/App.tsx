@@ -24,6 +24,7 @@ import {
 export default function App() {
   const [mode, setMode] = useState("search");
   const [searchMatchMode, setSearchMatchMode] = useState<"profile" | "similar">("profile");
+  const [searchMatchEngine, setSearchMatchEngine] = useState<"tfidf" | "semantic">("tfidf");
   const [filterOpts, setFilterOpts] = useState<any>(null);
   const [pillars, setPillars] = useState<any[]>([]);
   const [segments, setSegments] = useState<any[]>([]);
@@ -365,6 +366,50 @@ export default function App() {
   )?.label;
 
   const runSkillMatch = async () => {
+    const skillIds = selectedSkills.map((s) => String(s.id)).filter(Boolean);
+    if (searchMatchEngine === "semantic") {
+      const mergedProfile: UserProfile = {
+        experience: profileData?.experience || [],
+        education: profileData?.education || [],
+        hard_skills: selectedSkills.length ? selectedSkills : profileData?.hard_skills || [],
+        languages: profileData?.languages || [],
+        interested_industries: profileData?.interested_industries || [],
+      };
+      if (
+        !mergedProfile.hard_skills?.length &&
+        !mergedProfile.experience?.length
+      ) {
+        setError("Dodaj kompetencje lub uzupełnij profil (doświadczenie) dla dopasowania AI.");
+        return;
+      }
+      setError("");
+      setLoading(true);
+      setResultMeta(null);
+      try {
+        const data = await api.matchByProfileText({
+          profile_data: mergedProfile,
+          skill_ids: skillIds,
+          filters: apiFilters(),
+          limit: 24,
+        });
+        setOffers(data.offers || []);
+        setResultMeta({ count: data.count, mode: "profile_semantic" });
+        if (!data.offers?.length) {
+          setError(
+            "Brak wyników semantycznych. Uruchom embed_offers na backendzie lub poluzuj filtry."
+          );
+        } else {
+          setError("");
+        }
+      } catch (e) {
+        setError((e as Error).message);
+        setOffers([]);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     if (selectedSkills.length === 0) {
       setError("Dodaj co najmniej jedną kompetencję do profilu.");
       return;
@@ -401,10 +446,18 @@ export default function App() {
     setLoading(true);
     setResultMeta(null);
     try {
-      const data = await api.matchSimilar(offerId, apiFilters(), 24);
+      const skillIds = selectedSkills.map((s) => String(s.id)).filter(Boolean);
+      const data =
+        searchMatchEngine === "semantic"
+          ? await api.matchSimilarText(offerId, apiFilters(), skillIds, 24)
+          : await api.matchSimilar(offerId, apiFilters(), 24);
       setSeedOffer(data.seed || seed);
       setOffers(data.offers || []);
-      setResultMeta({ count: data.count, mode: "job", seed: data.seed });
+      setResultMeta({
+        count: data.count,
+        mode: searchMatchEngine === "semantic" ? "job_semantic" : "job",
+        seed: data.seed,
+      });
       if (!data.offers?.length) {
         setError("Brak podobnych ofert — spróbuj poluzować filtry.");
       } else {
@@ -427,6 +480,14 @@ export default function App() {
     setResultMeta(null);
     setError("");
     setSeedOffer(null);
+  };
+
+  const switchSearchMatchEngine = (next: "tfidf" | "semantic") => {
+    if (next === searchMatchEngine) return;
+    setSearchMatchEngine(next);
+    setOffers([]);
+    setResultMeta(null);
+    setError("");
   };
 
   const handleLogout = () => {
@@ -733,6 +794,39 @@ export default function App() {
                 </button>
               </div>
 
+              <div
+                className="search-mode-toggle search-engine-toggle"
+                role="tablist"
+                aria-label="Silnik dopasowania"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={searchMatchEngine === "tfidf"}
+                  className={
+                    searchMatchEngine === "tfidf"
+                      ? "search-mode-toggle__btn active"
+                      : "search-mode-toggle__btn"
+                  }
+                  onClick={() => switchSearchMatchEngine("tfidf")}
+                >
+                  Skille (TF-IDF)
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={searchMatchEngine === "semantic"}
+                  className={
+                    searchMatchEngine === "semantic"
+                      ? "search-mode-toggle__btn active"
+                      : "search-mode-toggle__btn"
+                  }
+                  onClick={() => switchSearchMatchEngine("semantic")}
+                >
+                  Opis (AI embedding)
+                </button>
+              </div>
+
               <Collapse title="Branża — pełna lista z bazy" defaultOpen={false}>
                 <label className="field">
                   <span className="field-label">Konkretna branża (lead_main)</span>
@@ -891,10 +985,17 @@ export default function App() {
               <div className="results-head">
                 <div>
                   <h2>Rekomendowane oferty</h2>
-                  {resultMeta?.count > 0 && searchMatchMode === "profile" && (
+                  {resultMeta?.count > 0 && searchMatchMode === "profile" && searchMatchEngine === "tfidf" && (
                     <p className="results-sub muted">
                       Posortowane wg cosine na wektorach TF-IDF (rzadsze skille ważą
                       więcej). Pierścień = dopasowanie, pasek = pokrycie wymagań oferty.
+                    </p>
+                  )}
+                  {resultMeta?.count > 0 && searchMatchEngine === "semantic" && (
+                    <p className="results-sub muted">
+                      Podobieństwo opisu profilu / oferty (SentenceTransformer + pełny
+                      tekst oferty). Pierścień = dopasowanie semantyczne; pasek = pokrycie
+                      skilli LightCast (jeśli wybrane).
                     </p>
                   )}
                 </div>
