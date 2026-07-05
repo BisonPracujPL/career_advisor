@@ -54,19 +54,41 @@ Używaj markdown (nagłówki ###, listy, **pogrubienia**). Bądź konkretny wzgl
 # ── Internal helpers ─────────────────────────────────────────────────────────
 
 def _skill_names(profile_data: dict) -> list[str]:
-    return [
-        s.get("skill_name", "")
-        for s in (profile_data.get("hard_skills") or [])
-        if s.get("skill_name")
-    ]
+    names = []
+    for s in profile_data.get("hard_skills") or []:
+        if not isinstance(s, dict):
+            continue
+        name = s.get("skill_name") or s.get("name") or ""
+        if name:
+            names.append(name)
+    return names
 
 
 def _skill_ids(profile_data: dict) -> list[str]:
-    return [
-        s.get("skill_id", "")
-        for s in (profile_data.get("hard_skills") or [])
-        if s.get("skill_id")
-    ]
+    ids = []
+    for s in profile_data.get("hard_skills") or []:
+        if not isinstance(s, dict):
+            continue
+        sid = s.get("skill_id") or s.get("id")
+        if sid:
+            ids.append(str(sid))
+    return ids
+
+
+def _career_path_steps(career_path) -> list:
+    """Accept career_path as {steps: [...]} or legacy list wrappers."""
+    if not career_path:
+        return []
+    if isinstance(career_path, dict):
+        steps = career_path.get("steps")
+        return list(steps) if isinstance(steps, list) else []
+    if isinstance(career_path, list):
+        for item in career_path:
+            if isinstance(item, dict) and isinstance(item.get("steps"), list):
+                return item["steps"]
+        if career_path and isinstance(career_path[0], dict):
+            return career_path
+    return []
 
 
 def _experience_summary(experience: list) -> str:
@@ -112,14 +134,7 @@ def build_chat_career_context(profile_data: dict | None) -> dict:
     skill_ids = _skill_ids(profile_data)
     industries = profile_data.get("interested_industries") or []
     experience = profile_data.get("experience") or []
-    career_path = profile_data.get("career_path") or []
-
-    # Steps from saved career path
-    steps = []
-    for s in (career_path or []):
-        if s.get("steps"):
-            steps = s["steps"]
-            break
+    steps = _career_path_steps(profile_data.get("career_path"))
 
     # Segment ranking
     try:

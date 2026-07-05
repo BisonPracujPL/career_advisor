@@ -375,6 +375,41 @@ body {
   padding: 0.5rem 0;
 }
 
+.search-mode-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+  margin: 0.65rem 1rem 1rem;
+  padding: 0.25rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.search-mode-toggle__btn {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.25;
+  padding: 0.55rem 0.45rem;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.search-mode-toggle__btn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.search-mode-toggle__btn.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
 .panel-main {
   padding: 1.25rem 1.5rem;
   min-height: 420px;

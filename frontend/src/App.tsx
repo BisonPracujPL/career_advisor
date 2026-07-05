@@ -22,7 +22,8 @@ import {
 } from "./types";
 
 export default function App() {
-  const [mode, setMode] = useState("skills");
+  const [mode, setMode] = useState("search");
+  const [searchMatchMode, setSearchMatchMode] = useState<"profile" | "similar">("profile");
   const [filterOpts, setFilterOpts] = useState<any>(null);
   const [pillars, setPillars] = useState<any[]>([]);
   const [segments, setSegments] = useState<any[]>([]);
@@ -419,6 +420,15 @@ export default function App() {
 
   const levelGroups = filterOpts?.position_level_groups || [];
 
+  const switchSearchMatchMode = (next: "profile" | "similar") => {
+    if (next === searchMatchMode) return;
+    setSearchMatchMode(next);
+    setOffers([]);
+    setResultMeta(null);
+    setError("");
+    setSeedOffer(null);
+  };
+
   const handleLogout = () => {
     localStorage.removeItem("auth_token");
     setIsLoggedIn(false);
@@ -576,7 +586,7 @@ export default function App() {
           onTakeBranch={takeCareerBranch}
           onResetPath={resetCareerPath}
         />
-      ) : (
+      ) : mode === "search" ? (
         <div className="app">
           {!isProfileLoading && isLoggedIn && !hasProfile && (
             <div className="alert" style={{ margin: "1rem 2rem", cursor: "pointer" }} onClick={() => setShowProfileWizard(true)}>
@@ -694,6 +704,35 @@ export default function App() {
 
           <div className="workspace">
             <aside className="panel panel-side">
+              <div className="search-mode-toggle" role="tablist" aria-label="Tryb dopasowania ofert">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={searchMatchMode === "profile"}
+                  className={
+                    searchMatchMode === "profile"
+                      ? "search-mode-toggle__btn active"
+                      : "search-mode-toggle__btn"
+                  }
+                  onClick={() => switchSearchMatchMode("profile")}
+                >
+                  Po profilu kompetencji
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={searchMatchMode === "similar"}
+                  className={
+                    searchMatchMode === "similar"
+                      ? "search-mode-toggle__btn active"
+                      : "search-mode-toggle__btn"
+                  }
+                  onClick={() => switchSearchMatchMode("similar")}
+                >
+                  Po podobnym stanowisku
+                </button>
+              </div>
+
               <Collapse title="Branża — pełna lista z bazy" defaultOpen={false}>
                 <label className="field">
                   <span className="field-label">Konkretna branża (lead_main)</span>
@@ -718,7 +757,7 @@ export default function App() {
                 </label>
               </Collapse>
 
-              {mode === "skills" && (
+              {searchMatchMode === "profile" && (
                 <Collapse title="Twój profil kompetencji" defaultOpen>
                   <label className="field">
                     <span className="field-label">Szukaj kompetencji</span>
@@ -810,7 +849,7 @@ export default function App() {
                 </Collapse>
               )}
 
-              {mode === "job" && (
+              {searchMatchMode === "similar" && (
                 <Collapse title="Wzorzec stanowiska" defaultOpen>
                   <label className="field">
                     <span className="field-label">Tytuł oferty</span>
@@ -852,7 +891,7 @@ export default function App() {
               <div className="results-head">
                 <div>
                   <h2>Rekomendowane oferty</h2>
-                  {resultMeta?.count > 0 && mode === "skills" && (
+                  {resultMeta?.count > 0 && searchMatchMode === "profile" && (
                     <p className="results-sub muted">
                       Posortowane wg cosine na wektorach TF-IDF (rzadsze skille ważą
                       więcej). Pierścień = dopasowanie, pasek = pokrycie wymagań oferty.
@@ -882,7 +921,7 @@ export default function App() {
                   <div className="empty-icon">◎</div>
                   <h3>Zacznij od profilu lub wzorca</h3>
                   <p>
-                    {mode === "skills"
+                    {searchMatchMode === "profile"
                       ? "Wybierz kompetencje i kliknij „Dopasuj oferty pracy”."
                       : "Wyszukaj tytuł stanowiska i wybierz ofertę z listy."}
                   </p>
@@ -901,7 +940,7 @@ export default function App() {
             </main>
           </div>
         </div>
-      )}
+      ) : null}
     </>
   );
 }

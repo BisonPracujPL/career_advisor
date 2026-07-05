@@ -2,8 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { UserProfile } from '../types';
 
 export const MODES = [
-  { id: "skills", label: "Profil kompetencji", icon: "◆" },
-  { id: "job", label: "Podobne stanowisko", icon: "◇" },
+  { id: "search", label: "Szukaj pracy", icon: "◆" },
   { id: "path", label: "Ścieżka kariery", icon: "◎" },
   { id: "chat", label: "Doradca AI", icon: "💬" },
 ];
@@ -35,7 +34,7 @@ export function Navbar({ mode, setMode, isLoggedIn, setShowAuth, handleLogout, o
     <nav className="global-nav">
       <div className="global-nav-content">
         <div className="global-nav-left">
-          <a href="#" className="global-nav-brand" onClick={(e) => { e.preventDefault(); setMode("skills"); }}>
+          <a href="#" className="global-nav-brand" onClick={(e) => { e.preventDefault(); setMode("search"); }}>
             career advisor
           </a>
           <div className="global-nav-links">
