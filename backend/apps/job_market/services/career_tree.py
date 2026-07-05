@@ -53,10 +53,7 @@ def segment_market_insight(lead_main: str, lead_sub: str) -> dict:
     sample_ids = list(qs.values_list("id", flat=True)[:INSIGHT_SAMPLE_SIZE])
     qs_sample = qs.filter(id__in=sample_ids) if sample_ids else qs.none()
     snapshot = _level_snapshot(qs_sample)
-    sal_uop = _salary_stats(
-        qs_sample.filter(salary_uop_duration__icontains="mies"),
-        "uop",
-    )
+    sal_uop = _salary_stats(qs_sample, "uop")
     return {
         "offer_count": size,
         "median_salary_uop": sal_uop["median"] if sal_uop else None,

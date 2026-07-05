@@ -8,6 +8,7 @@ from django.db.models import Q
 
 from apps.job_market.constants import LEVEL_VALUES_BY_GROUP, POSITION_LEVEL_GROUPS
 from apps.job_market.services.pillar_labels import pillar_label_for_lead_main, segment_display_label
+from apps.job_market.services.salary_normalization import HOURS_PER_MONTH, monthly_pln, offer_monthly_pln
 from apps.job_market.services.wordcloud_img import build_skills_wordcloud_png
 from apps.job_market.models import ExtractedSkills, JobOffer, Skill
 from apps.job_market.services import matching
@@ -154,10 +155,12 @@ def _level_stats(qs, filters: dict | None = None) -> list[dict]:
         "position_levels",
         "salary_uop_from",
         "salary_uop_to",
+        "salary_uop_duration",
         "salary_b2b_from",
         "salary_b2b_to",
+        "salary_b2b_duration",
     )[:50000]:
-        levels, uop_f, uop_t, b2b_f, b2b_t = row
+        levels, uop_f, uop_t, uop_d, b2b_f, b2b_t, b2b_d = row
         bucket = _bucket_for_offer(levels or [], filters)
         if not bucket:
             continue
@@ -166,11 +169,7 @@ def _level_stats(qs, filters: dict | None = None) -> list[dict]:
             buckets[gid] = {"level_id": gid, "level": label, "count": 0, "salaries": []}
         buckets[gid]["count"] += 1
         total += 1
-        val = None
-        if uop_f and float(uop_f) > 0:
-            val = (float(uop_f) + float(uop_t or uop_f)) / 2.0
-        elif b2b_f and float(b2b_f) > 0:
-            val = (float(b2b_f) + float(b2b_t or b2b_f)) / 2.0
+        val = offer_monthly_pln(uop_f, uop_t, uop_d, b2b_f, b2b_t, b2b_d)
         if val and val > 0:
             buckets[gid]["salaries"].append(val)
 
@@ -229,16 +228,15 @@ def _level_snapshot(qs, filters: dict | None = None) -> list[dict]:
 def _salary_stats(qs, prefix: str) -> dict | None:
     from_field = f"salary_{prefix}_from"
     to_field = f"salary_{prefix}_to"
+    duration_field = f"salary_{prefix}_duration"
     values = []
-    for row in qs.exclude(**{from_field: None}).values_list(from_field, to_field)[:50000]:
-        lo, hi = row
-        if lo is None:
-            continue
-        lo_f = float(lo)
-        if lo_f <= 0:
-            continue
-        hi_f = float(hi) if hi and float(hi) > 0 else lo_f
-        values.append((lo_f + hi_f) / 2.0)
+    for row in qs.exclude(**{from_field: None}).values_list(
+        from_field, to_field, duration_field
+    )[:50000]:
+        lo, hi, duration = row
+        val = monthly_pln(lo, hi, duration)
+        if val is not None and val > 0:
+            values.append(val)
     return _percentiles(values)
 
 
@@ -410,17 +408,15 @@ def get_segment_analytics(
         "seniority_distribution": _seniority_distribution(qs, filters),
         "salary_by_level": _salary_by_level(qs, filters),
         "level_snapshot": _level_snapshot(qs, filters),
-        "salary_uop_monthly": _salary_stats(
-            qs.filter(salary_uop_duration__icontains="mies"),
-            "uop",
-        ),
-        "salary_b2b_monthly": _salary_stats(
-            qs.filter(salary_b2b_duration__icontains="mies"),
-            "b2b",
-        ),
+        "salary_uop_monthly": _salary_stats(qs, "uop"),
+        "salary_b2b_monthly": _salary_stats(qs, "b2b"),
         "skill_fit": skill_fit,
         "match_score": match_score,
         "filters_applied": filters or {},
+        "salary_normalization": {
+            "unit": "PLN/month",
+            "hourly_to_monthly_hours": HOURS_PER_MONTH,
+        },
     }
 
 

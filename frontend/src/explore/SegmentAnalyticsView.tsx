@@ -121,7 +121,10 @@ export function SegmentAnalyticsView({
           Statystyki dla ofert spełniających wybrane filtry regionu i poziomu. Oferty na dole
           listy również respektują te filtry.
         </p>
-        <SegmentLevelCharts rows={levelRows} />
+        <SegmentLevelCharts
+          rows={levelRows}
+          hourlyToMonthlyHours={data.salary_normalization?.hourly_to_monthly_hours}
+        />
       </section>
 
       <section className="explore-card explore-card--match">

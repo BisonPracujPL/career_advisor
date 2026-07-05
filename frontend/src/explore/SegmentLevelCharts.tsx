@@ -8,9 +8,11 @@ interface LevelRow {
 
 interface SegmentLevelChartsProps {
   rows: LevelRow[];
+  /** Hours used to convert hourly rates to monthly (for footnote). */
+  hourlyToMonthlyHours?: number;
 }
 
-export function SegmentLevelCharts({ rows }: SegmentLevelChartsProps) {
+export function SegmentLevelCharts({ rows, hourlyToMonthlyHours = 168 }: SegmentLevelChartsProps) {
   const withCount = rows.filter((r) => r.offer_count > 0);
   const chartRows = [...withCount].sort((a, b) => {
     const am = a.median_salary ?? -1;
@@ -29,7 +31,11 @@ export function SegmentLevelCharts({ rows }: SegmentLevelChartsProps) {
   return (
     <div className="segment-level-charts">
       <div className="segment-level-charts__panel">
-        <h4>Mediana wynagrodzenia (PLN)</h4>
+        <h4>Mediana wynagrodzenia (PLN / mies.)</h4>
+        <p className="muted segment-level-charts__note">
+          Widełki UoP i B2B przeliczone do kwoty miesięcznej; stawki godzinowe ×{" "}
+          {hourlyToMonthlyHours} h.
+        </p>
         <ul className="salary-bar-chart">
           {chartRows.map((row) => {
             if (row.median_salary == null || row.median_salary <= 0) {
@@ -75,7 +81,7 @@ export function SegmentLevelCharts({ rows }: SegmentLevelChartsProps) {
               <th>Stanowisko</th>
               <th>Ofert</th>
               <th>Udział</th>
-              <th>Mediana PLN</th>
+              <th>Mediana PLN / mies.</th>
             </tr>
           </thead>
           <tbody>

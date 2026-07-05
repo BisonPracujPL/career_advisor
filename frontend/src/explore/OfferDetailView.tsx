@@ -4,6 +4,7 @@ import { SegmentOffersList } from "./SegmentOffersList";
 import { ExploreBackButton } from "./ExploreBackButton";
 import { SegmentAnalysisButton } from "./SegmentAnalysisButton";
 import { segmentDisplayLabel } from "./pillar";
+import { formatOfferSalaryLine } from "./salaryFormat";
 
 interface OfferDetailViewProps {
   detail: OfferDetail;
@@ -15,11 +16,8 @@ interface OfferDetailViewProps {
   onOpenOffer: (offerId: number | string) => void;
 }
 
-function formatSalary(block: OfferDetail["salary_uop"]) {
-  if (!block) return null;
-  const from = block.from?.toLocaleString("pl-PL");
-  const to = block.to?.toLocaleString("pl-PL") ?? from;
-  return `${from} – ${to} ${block.currency} (${block.duration || "brutto"})`;
+function formatSalary(contract: "UoP" | "B2B", block: OfferDetail["salary_uop"]) {
+  return formatOfferSalaryLine(contract, block);
 }
 
 function TextBlock({ title, text }: { title: string; text: string }) {
@@ -42,8 +40,8 @@ export function OfferDetailView({
   onOpenOffer,
 }: OfferDetailViewProps) {
   const ov = detail.overlap;
-  const uop = formatSalary(detail.salary_uop);
-  const b2b = formatSalary(detail.salary_b2b);
+  const uop = formatSalary("UoP", detail.salary_uop);
+  const b2b = formatSalary("B2B", detail.salary_b2b);
   const selectedIds = new Set(selectedSkills.map((s) => String(s.id)));
   const segmentLabel =
     detail.segment_display_label ||
@@ -125,12 +123,12 @@ export function OfferDetailView({
         <h4 className="explore-subhead">Wynagrodzenie</h4>
         {uop && (
           <p className="salbox">
-            UoP: <strong>{uop}</strong>
+            <strong>{uop}</strong>
           </p>
         )}
         {b2b && (
           <p className="salbox">
-            B2B: <strong>{b2b}</strong>
+            <strong>{b2b}</strong>
           </p>
         )}
         {!uop && !b2b && <p className="muted">Brak widełek w danych.</p>}

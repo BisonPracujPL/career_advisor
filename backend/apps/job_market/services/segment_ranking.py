@@ -113,7 +113,7 @@ def _score_segment_candidate(
             lead_main_category=lead_main,
             lead_sub_category=lead_sub,
         )
-        sal_uop = _salary_stats(qs.filter(salary_uop_duration__icontains="mies"), "uop")
+        sal_uop = _salary_stats(qs, "uop")
         entry["skill_coverage_pct"] = fit["coverage_pct"]
         entry["top_missing_skills"] = fit["missing"][:5]
         entry["median_salary_uop"] = sal_uop["median"] if sal_uop else None
