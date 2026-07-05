@@ -166,6 +166,7 @@ export interface SegmentAnalytics {
     avg_coverage_pct: number;
   } | null;
   filters_applied?: { region_name?: string; position_level_groups?: string[] };
+  salary_normalization?: { unit: string; hourly_to_monthly_hours: number };
   sample_offers: Offer[];
 }
 

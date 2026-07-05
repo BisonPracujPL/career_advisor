@@ -3288,6 +3288,11 @@ body {
   margin-bottom: 0.5rem;
 }
 
+.roadmap-detail__revert {
+  width: 100%;
+  margin-top: 0.75rem;
+}
+
 .roadmap-detail__hint {
   font-size: 0.85rem;
   margin: 0;
@@ -3774,6 +3779,91 @@ body {
   gap: 0.5rem;
   flex-shrink: 0;
   flex-wrap: wrap;
+}
+
+.virtual-profile-panel {
+  margin-bottom: 1rem;
+  padding: 0;
+  overflow: hidden;
+}
+
+.virtual-profile-panel__toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border: none;
+  background: rgba(28, 176, 246, 0.06);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  transition: background 0.15s ease;
+}
+
+.virtual-profile-panel--open .virtual-profile-panel__toggle {
+  border-bottom: 1px solid var(--border);
+  background: rgba(28, 176, 246, 0.04);
+}
+
+.virtual-profile-panel__toggle:hover {
+  background: rgba(28, 176, 246, 0.1);
+}
+
+.virtual-profile-panel__title {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.virtual-profile-panel__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.virtual-profile-panel__count {
+  font-size: 0.82rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.virtual-profile-panel__chev {
+  color: var(--accent);
+  font-size: 0.75rem;
+}
+
+.virtual-profile-panel__body {
+  padding: 1rem 1.25rem 1.25rem;
+}
+
+.virtual-profile-panel__hint {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.virtual-profile-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.virtual-profile-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.virtual-profile-section__title {
+  margin: 0 0 1rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.35;
 }
 
 .career-matrix {

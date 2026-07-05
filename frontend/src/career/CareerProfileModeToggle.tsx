@@ -51,8 +51,9 @@ export function CareerVirtualBanner({
       <div>
         <strong>Tryb wirtualny</strong>
         <p>
-          Eksperymentujesz bez zapisywania w profilu ({skillCount} skilli w symulacji).
-          Ścieżka i skille wirtualne żyją tylko w tej przeglądarce.
+          Eksperymentujesz bez zapisywania w profilu ({skillCount}{" "}
+          {skillCount === 1 ? "skill" : "skilli"} w symulacji). Dodaj kompetencje poniżej,
+          skopiuj profil albo wybierz gałąź „Uczę się” na mapie.
         </p>
       </div>
       <div className="career-virtual-banner__actions">
