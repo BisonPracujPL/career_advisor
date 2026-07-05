@@ -18,8 +18,8 @@ const STATE_SIZE = 80;
 const BRANCH_SIZE = 68;
 const CANVAS_WIDTH = 960;
 const CANVAS_CENTER = CANVAS_WIDTH / 2;
-const LEVEL_HEIGHT = 210;
-const BRANCH_Y_OFFSET = 96;
+const LEVEL_HEIGHT = 300;
+const BRANCH_Y_OFFSET = 108;
 
 function formatPln(n: number | null | undefined) {
   if (n == null) return "—";
@@ -256,6 +256,7 @@ function TreeNodeView({ item, selected, unlocking, onSelect }: TreeNodeViewProps
   const branch = isBranch ? (node as TreeBranchNode) : null;
   const isBundle = branch?.branch_type === "bundle";
   const side = x >= CANVAS_CENTER ? "right" : "left";
+  const branchLabelSide = isBranch && branch?.status === "completed" ? side : null;
 
   return (
     <div
@@ -286,10 +287,16 @@ function TreeNodeView({ item, selected, unlocking, onSelect }: TreeNodeViewProps
         )}
       </button>
       <div
-        className={`tree-node-label tree-node-label--${isState ? "state" : "branch"} tree-node-label--${side}`}
+        className={`tree-node-label tree-node-label--${isState ? "state" : "branch"} ${
+          branchLabelSide
+            ? `tree-node-label--side tree-node-label--${branchLabelSide}`
+            : isState
+              ? `tree-node-label--${side}`
+              : "tree-node-label--below"
+        } ${node.status === "completed" ? "tree-node-label--completed" : ""}`}
       >
-        <strong>{node.title}</strong>
-        <span>{node.subtitle}</span>
+        <strong title={node.title}>{node.title}</strong>
+        <span title={node.subtitle}>{node.subtitle}</span>
         {isBranch && (
           <em className="tree-node-label__gain">
             {(node as TreeBranchNode).match_before}% → {(node as TreeBranchNode).match_after}%

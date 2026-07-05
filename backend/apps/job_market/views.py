@@ -86,6 +86,48 @@ class SkillSubcategoriesView(APIView):
         )
 
 
+class SkillResolveView(APIView):
+    """Fill LightCast skill ids for profile entries saved with name only."""
+
+    def post(self, request):
+        items = request.data.get("skills") or []
+        out = []
+        updated = False
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            name = (item.get("name") or "").strip()
+            sid = item.get("id")
+            if sid:
+                out.append(
+                    {
+                        "id": str(sid),
+                        "name": name
+                        or Skill.objects.filter(id=sid).values_list("name", flat=True).first()
+                        or str(sid),
+                        "main_category": item.get("main_category"),
+                        "subcategory": item.get("subcategory"),
+                    }
+                )
+                continue
+            if not name:
+                continue
+            row = Skill.objects.filter(is_category=False, name__iexact=name).first()
+            if row:
+                updated = True
+                out.append(
+                    {
+                        "id": row.id,
+                        "name": row.name,
+                        "main_category": row.main_category,
+                        "subcategory": row.subcategory,
+                    }
+                )
+            else:
+                out.append(item)
+        return Response({"skills": out, "updated": updated})
+
+
 class SkillBrowseView(APIView):
     def get(self, request):
         main_code = request.query_params.get("main_category_code")

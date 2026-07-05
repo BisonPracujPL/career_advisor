@@ -490,6 +490,7 @@ function StepSkillsCombined({ data, onChange }: { data: Skill[], onChange: (d: S
   const addSkill = (skillObj: any) => {
     if (!data.find((s) => s.name === skillObj.name)) {
       onChange([...data, {
+        id: skillObj.id,
         name: skillObj.name,
         main_category: skillObj.main_category || "Inne",
         subcategory: skillObj.subcategory || "Ogólne"

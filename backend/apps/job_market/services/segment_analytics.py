@@ -257,13 +257,95 @@ def _skill_fit(user_skill_ids: list[str], top_skills: list[dict]) -> dict:
     return {"have": have, "missing": missing, "coverage_pct": cov}
 
 
+def _filters_cache_key(filters: dict | None) -> tuple:
+    if not filters:
+        return ()
+    items: list[tuple] = []
+    for key, value in sorted(filters.items()):
+        if isinstance(value, list):
+            items.append((key, tuple(value)))
+        elif isinstance(value, dict):
+            items.append((key, tuple(sorted(value.items()))))
+        else:
+            items.append((key, value))
+    return tuple(items)
+
+
+def _match_cache_key(
+    skill_ids: list[str],
+    lead_main: str,
+    lead_sub: str,
+    filters: dict | None,
+    match_limit: int,
+) -> tuple:
+    return (
+        tuple(sorted(skill_ids)),
+        lead_main,
+        lead_sub,
+        _filters_cache_key(filters),
+        match_limit,
+    )
+
+
+class SegmentMatchCache:
+    """Thread-safe, request-scoped cache for repeated segment match scores."""
+
+    def __init__(self) -> None:
+        import threading
+
+        self._data: dict[tuple, dict] = {}
+        self._lock = threading.Lock()
+
+    def score(
+        self,
+        skill_ids: list[str],
+        lead_main: str,
+        lead_sub: str,
+        filters: dict | None = None,
+        match_limit: int = 60,
+    ) -> dict | None:
+        key = _match_cache_key(skill_ids, lead_main, lead_sub, filters, match_limit)
+        with self._lock:
+            hit = self._data.get(key)
+        if hit is not None:
+            return hit
+        result = _segment_match_score(
+            skill_ids,
+            lead_main,
+            lead_sub,
+            filters=filters,
+            match_limit=match_limit,
+        )
+        with self._lock:
+            self._data[key] = result
+        return result
+
+    def pct(
+        self,
+        skill_ids: list[str],
+        lead_main: str,
+        lead_sub: str,
+        filters: dict | None = None,
+        match_limit: int = 60,
+    ) -> int:
+        match = self.score(
+            skill_ids, lead_main, lead_sub, filters=filters, match_limit=match_limit
+        ) or {}
+        return int(match.get("avg_similarity_pct", 0))
+
+
 def _segment_match_score(
     skill_ids: list[str],
     lead_main: str,
     lead_sub: str,
     filters: dict | None = None,
     match_limit: int = 60,
+    match_cache: SegmentMatchCache | None = None,
 ) -> dict | None:
+    if match_cache is not None:
+        return match_cache.score(
+            skill_ids, lead_main, lead_sub, filters=filters, match_limit=match_limit
+        )
     if not skill_ids:
         return None
     seg_filters = {
@@ -276,11 +358,15 @@ def _segment_match_score(
         limit=match_limit,
         min_similarity=0,
         filters=seg_filters,
+        lite=True,
     )
     if not results:
         return {"matching_offers": 0, "avg_similarity_pct": 0}
-    sims = [r["similarity_pct"] for r in results]
-    top = sorted(sims, reverse=True)[:20]
+    sims = [r["similarity_pct"] for r in results if r.get("similarity_pct") is not None]
+    if not sims:
+        return {"matching_offers": 0, "avg_similarity_pct": 0}
+    top_n = min(12, len(sims))
+    top = sorted(sims, reverse=True)[:top_n]
     return {
         "matching_offers": len(results),
         "avg_similarity_pct": int(round(sum(top) / len(top))),

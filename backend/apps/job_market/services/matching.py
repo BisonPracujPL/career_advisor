@@ -151,6 +151,12 @@ def serialize_offer_row(
     }
 
 
+def _candidate_pool_size(limit: int) -> int:
+    if limit <= 24:
+        return max(limit * 3, 32)
+    return max(limit * 8, 50)
+
+
 def find_similar_offers(
     query_vector,
     *,
@@ -159,55 +165,67 @@ def find_similar_offers(
     filters: dict | None = None,
     exclude_offer_id: int | None = None,
     user_skill_ids: list[str] | None = None,
+    query_is_profile: bool = False,
+    lite: bool = False,
 ):
     if query_vector is None:
         return []
 
-    qs = (
-        ExtractedSkills.objects.exclude(skill_vector__isnull=True)
-        .select_related("offer")
-        .annotate(distance=CosineDistance("skill_vector", query_vector))
-    )
+    qs = ExtractedSkills.objects.exclude(skill_vector__isnull=True)
+    if not lite:
+        qs = qs.select_related("offer")
+    qs = qs.annotate(distance=CosineDistance("skill_vector", query_vector))
     if exclude_offer_id:
         qs = qs.exclude(offer_id=exclude_offer_id)
     qs = _apply_offer_filters(qs, filters)
 
-    # Pull top candidates in SQL (cosine distance), then apply min_similarity.
-    candidates = list(qs.order_by("distance")[: max(limit * 8, 50)])
+    candidates = list(qs.order_by("distance")[: _candidate_pool_size(limit)])
 
-    user_vec = build_profile_vector(user_skill_ids) if user_skill_ids else None
     user_sim_map: dict[int, float] = {}
-    if user_vec and candidates:
-        cand_pks = [es.pk for es in candidates]
-        for row in (
-            ExtractedSkills.objects.filter(pk__in=cand_pks)
-            .annotate(udist=CosineDistance("skill_vector", user_vec))
-            .values("pk", "udist")
-        ):
-            udist = row["udist"]
-            if udist is not None:
-                d = float(udist)
-                if d == d:
-                    user_sim_map[row["pk"]] = 1.0 - d
+    if query_is_profile:
+        for es in candidates:
+            if es.distance is None:
+                continue
+            dist = float(es.distance)
+            if dist == dist:
+                user_sim_map[es.pk] = 1.0 - dist
+    elif user_skill_ids and candidates:
+        user_vec = build_profile_vector(user_skill_ids)
+        if user_vec:
+            cand_pks = [es.pk for es in candidates]
+            for row in (
+                ExtractedSkills.objects.filter(pk__in=cand_pks)
+                .annotate(udist=CosineDistance("skill_vector", user_vec))
+                .values("pk", "udist")
+            ):
+                udist = row["udist"]
+                if udist is not None:
+                    d = float(udist)
+                    if d == d:
+                        user_sim_map[row["pk"]] = 1.0 - d
 
     results = []
     for es in candidates:
         if es.distance is None:
             continue
         dist = float(es.distance)
-        if dist != dist:  # Check for NaN
+        if dist != dist:
             continue
         sim = 1.0 - dist
         if sim < min_similarity:
             continue
-        results.append(
-            serialize_offer_row(
-                es,
-                sim,
-                user_skill_ids,
-                user_sim_map.get(es.pk),
+        if lite:
+            user_sim = user_sim_map.get(es.pk, sim)
+            results.append({"similarity_pct": int(round(user_sim * 100))})
+        else:
+            results.append(
+                serialize_offer_row(
+                    es,
+                    sim,
+                    user_skill_ids,
+                    user_sim_map.get(es.pk),
+                )
             )
-        )
         if len(results) >= limit:
             break
     return results
@@ -215,7 +233,12 @@ def find_similar_offers(
 
 def match_by_skills(skill_ids: list[str], **kwargs):
     vec = build_profile_vector(skill_ids)
-    return find_similar_offers(vec, user_skill_ids=skill_ids, **kwargs)
+    return find_similar_offers(
+        vec,
+        user_skill_ids=skill_ids,
+        query_is_profile=True,
+        **kwargs,
+    )
 
 
 def profile_offer_similarity(offer_id: int, user_skill_ids: list[str]) -> int | None:

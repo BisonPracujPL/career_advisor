@@ -1,4 +1,5 @@
 import { MultiSelect } from "../components/ui";
+import { SkillSessionBanner } from "../components/SkillSessionBanner";
 import { SegmentAnalytics, Skill } from "../types";
 import { SkillMetricsBar } from "./SkillMetricsBar";
 import { SkillWordCloud } from "./SkillWordCloud";
@@ -24,6 +25,10 @@ interface SegmentAnalyticsViewProps {
   onApplyFilters: () => void;
   onAddSkill: (skill: Skill) => void;
   onRemoveSkill: (skillId: string) => void;
+  skillsDirty?: boolean;
+  skillsSaving?: boolean;
+  onSaveSkills?: () => void | Promise<void>;
+  onResetSkills?: () => void;
   onBack: () => void;
   onOpenOffer: (offerId: number | string) => void;
 }
@@ -40,6 +45,10 @@ export function SegmentAnalyticsView({
   onApplyFilters,
   onAddSkill,
   onRemoveSkill,
+  skillsDirty = false,
+  skillsSaving = false,
+  onSaveSkills,
+  onResetSkills,
   onBack,
   onOpenOffer,
 }: SegmentAnalyticsViewProps) {
@@ -126,10 +135,18 @@ export function SegmentAnalyticsView({
 
       <section className="explore-card explore-card--match">
         <h3>Dopasowanie</h3>
+        {onSaveSkills && onResetSkills && (
+          <SkillSessionBanner
+            dirty={skillsDirty}
+            saving={skillsSaving}
+            onSave={onSaveSkills}
+            onReset={onResetSkills}
+          />
+        )}
         <p className="muted explore-hint">
-          Symuluj profil na top 20 kompetencjach segmentu. Średnie dopasowanie liczymy z 20
-          najlepiej pasujących ofert (TF-IDF cosine) — czasem % może spaść po dodaniu skilli,
-          jeśli nowy skill jest rzadszy w segmencie lub zmienia kierunek wektora profilu.
+          Kliknij „+” przy brakujących kompetencjach — dodajesz je do symulacji i od razu
+          widzisz zmianę dopasowania. Średnie dopasowanie liczymy z 20 najlepiej pasujących
+          ofert (TF-IDF cosine).
         </p>
         <SkillMetricsBar
           matchLabel="śr. dopasowanie w segmencie"

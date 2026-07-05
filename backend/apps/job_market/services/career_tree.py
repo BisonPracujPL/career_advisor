@@ -5,6 +5,7 @@ from __future__ import annotations
 from apps.job_market.models import JobOffer, Skill
 from apps.job_market.services.pillar_labels import segment_display_label
 from apps.job_market.services.segment_analytics import (
+    SegmentMatchCache,
     _enrich_skill_pcts,
     _level_snapshot,
     _salary_stats,
@@ -16,12 +17,15 @@ from apps.job_market.services.segment_ranking import (
     top_segment_without_skills,
 )
 
-MAX_BRANCHES = 6
+MAX_BRANCHES = 4
+MAX_BUNDLE_BRANCHES = 2
+MAX_SINGLE_BRANCHES = 2
 TREE_RANK_LIMIT = 8
-TREE_MAX_CANDIDATES = 20
+TREE_MAX_CANDIDATES = 12
+RANK_MATCH_LIMIT = 16
 SKILLS_PER_SEGMENT = 2
 BUNDLE_SIZE = 3
-MATCH_TRIAL_LIMIT = 24
+MATCH_TRIAL_LIMIT = 16
 INSIGHT_SAMPLE_SIZE = 6000
 LEVEL_SALARY_KEYS = ("junior", "mid", "senior")
 LEVEL_ORDER = ("junior", "mid", "senior")
@@ -84,6 +88,7 @@ def _segment_match_pct(
     lead_main: str,
     lead_sub: str,
     filters: dict | None = None,
+    match_cache: SegmentMatchCache | None = None,
 ) -> int:
     match = _segment_match_score(
         skill_ids,
@@ -91,6 +96,7 @@ def _segment_match_pct(
         lead_sub,
         filters=filters,
         match_limit=MATCH_TRIAL_LIMIT,
+        match_cache=match_cache,
     ) or {}
     return int(match.get("avg_similarity_pct", 0))
 
@@ -121,7 +127,11 @@ def _skill_details(skill_ids: list[str]) -> list[dict]:
     return [{"id": sid, "name": names.get(sid, sid)} for sid in skill_ids]
 
 
-def _rank_for_tree(skill_ids: list[str], industries: list | None) -> list[dict]:
+def _rank_for_tree(
+    skill_ids: list[str],
+    industries: list | None,
+    match_cache: SegmentMatchCache,
+) -> list[dict]:
     if skill_ids:
         return rank_segments_for_profile(
             skill_ids,
@@ -129,6 +139,9 @@ def _rank_for_tree(skill_ids: list[str], industries: list | None) -> list[dict]:
             limit=TREE_RANK_LIMIT,
             max_candidates=TREE_MAX_CANDIDATES,
             fast=True,
+            match_limit=RANK_MATCH_LIMIT,
+            match_cache=match_cache,
+            parallel=True,
         )
     fallback = top_segment_without_skills(industries)
     return [fallback] if fallback else []
@@ -142,6 +155,7 @@ def _branch_row(
     branch_type: str,
     primary_skill: dict,
     extra_skills: list[dict] | None = None,
+    match_cache: SegmentMatchCache | None = None,
 ) -> dict | None:
     lead_main = seg["lead_main_category"]
     lead_sub = seg["lead_sub_category"]
@@ -158,7 +172,9 @@ def _branch_row(
         if sid not in trial_ids:
             trial_ids.append(sid)
 
-    new_match = _segment_match_pct(trial_ids, lead_main, lead_sub)
+    new_match = _segment_match_pct(
+        trial_ids, lead_main, lead_sub, match_cache=match_cache
+    )
     delta = new_match - base_match
     if skill_ids and delta <= 0:
         return None
@@ -197,9 +213,20 @@ def _branch_row(
 def _generate_branches(
     skill_ids: list[str],
     ranked: list[dict],
+    match_cache: SegmentMatchCache,
+    top_skills_cache: dict[tuple[str, str], list[dict]],
 ) -> list[dict]:
     user_set = set(skill_ids or [])
     candidates: list[dict] = []
+
+    def top_skills_for(lead_main: str, lead_sub: str, size: int) -> list[dict]:
+        key = (lead_main, lead_sub)
+        if key not in top_skills_cache:
+            top_skills_cache[key] = _enrich_skill_pcts(
+                _top_skills_in_segment(lead_main, lead_sub, limit=12),
+                size,
+            )
+        return top_skills_cache[key]
 
     for seg in ranked[:TREE_RANK_LIMIT]:
         lead_main = seg["lead_main_category"]
@@ -207,10 +234,7 @@ def _generate_branches(
         size = seg["offer_count"]
         base_match = seg["match_pct"] if skill_ids else 0
 
-        top = _enrich_skill_pcts(
-            _top_skills_in_segment(lead_main, lead_sub, limit=12),
-            size,
-        )
+        top = top_skills_for(lead_main, lead_sub, size)
         missing = [s for s in top if s["id"] not in user_set]
         if not missing:
             continue
@@ -224,6 +248,7 @@ def _generate_branches(
                 branch_type="bundle",
                 primary_skill=bundle_pool[0],
                 extra_skills=bundle_pool[1:],
+                match_cache=match_cache,
             )
             if bundle_row:
                 candidates.append(bundle_row)
@@ -235,25 +260,38 @@ def _generate_branches(
                 base_match=base_match,
                 branch_type="single",
                 primary_skill=skill,
+                match_cache=match_cache,
             )
             if single_row:
                 candidates.append(single_row)
+
+        if len(candidates) >= MAX_BRANCHES * 2:
+            break
 
     candidates.sort(key=lambda x: (-x["match_delta"], -x["match_after"]))
 
     seen_segments: set[tuple[str, str]] = set()
     seen_keys: set[str] = set()
     branches: list[dict] = []
+    bundle_count = 0
+    single_count = 0
     for row in candidates:
         seg_key = (row["lead_main_category"], row["lead_sub_category"])
         dedupe_key = f"{row['branch_type']}|{row['id']}"
         if dedupe_key in seen_keys:
             continue
-        if row["branch_type"] == "single" and seg_key in seen_segments:
-            continue
-        seen_keys.add(dedupe_key)
-        if row["branch_type"] == "single":
+        if row["branch_type"] == "bundle":
+            if bundle_count >= MAX_BUNDLE_BRANCHES:
+                continue
+            bundle_count += 1
+        else:
+            if single_count >= MAX_SINGLE_BRANCHES:
+                continue
+            if seg_key in seen_segments:
+                continue
+            single_count += 1
             seen_segments.add(seg_key)
+        seen_keys.add(dedupe_key)
         branches.append(row)
         if len(branches) >= MAX_BRANCHES:
             break
@@ -325,9 +363,14 @@ def _next_level_readiness(
     skill_ids: list[str],
     experience: list | None,
     best_segment: dict | None,
+    match_cache: SegmentMatchCache | None = None,
+    top_skills_cache: dict[tuple[str, str], list[dict]] | None = None,
 ) -> dict | None:
     if not best_segment:
         return None
+
+    match_cache = match_cache or SegmentMatchCache()
+    top_skills_cache = top_skills_cache if top_skills_cache is not None else {}
 
     current = _infer_career_level(experience)
     target = _next_career_level(current)
@@ -338,15 +381,18 @@ def _next_level_readiness(
     lead_sub = best_segment["lead_sub_category"]
     level_filter = {"position_level_groups": [target]}
 
-    match_now = _segment_match_pct(skill_ids, lead_main, lead_sub)
+    match_now = int(best_segment.get("match_pct") or 0)
     match_target = _segment_match_pct(
-        skill_ids, lead_main, lead_sub, filters=level_filter
+        skill_ids, lead_main, lead_sub, filters=level_filter, match_cache=match_cache
     )
 
-    top = _enrich_skill_pcts(
-        _top_skills_in_segment(lead_main, lead_sub, limit=12),
-        best_segment.get("offer_count") or 0,
-    )
+    seg_key = (lead_main, lead_sub)
+    if seg_key not in top_skills_cache:
+        top_skills_cache[seg_key] = _enrich_skill_pcts(
+            _top_skills_in_segment(lead_main, lead_sub, limit=12),
+            best_segment.get("offer_count") or 0,
+        )
+    top = top_skills_cache[seg_key]
     user_set = set(skill_ids or [])
     missing = [s for s in top if s["id"] not in user_set][:BUNDLE_SIZE]
     bundle_ids = [s["id"] for s in missing]
@@ -356,7 +402,11 @@ def _next_level_readiness(
             trial_ids.append(sid)
 
     match_after_bundle = _segment_match_pct(
-        trial_ids, lead_main, lead_sub, filters=level_filter
+        trial_ids,
+        lead_main,
+        lead_sub,
+        filters=level_filter,
+        match_cache=match_cache,
     )
 
     return {
@@ -428,7 +478,9 @@ def build_career_tree(
     taken_ids = {s["skill_id"] for s in steps}
     base_skills = [s for s in (skill_ids or []) if s not in taken_ids]
 
-    ranked = _rank_for_tree(skill_ids or [], industries)
+    match_cache = SegmentMatchCache()
+    top_skills_cache: dict[tuple[str, str], list[dict]] = {}
+    ranked = _rank_for_tree(skill_ids or [], industries, match_cache)
 
     levels: list[dict] = []
     accumulated = list(base_skills)
@@ -472,7 +524,9 @@ def build_career_tree(
 
     current_skills = list(skill_ids or [])
     active_state = _active_state_node(current_skills, ranked, len(steps))
-    branches = _generate_branches(current_skills, ranked)
+    branches = _generate_branches(
+        current_skills, ranked, match_cache, top_skills_cache
+    )
 
     levels.append(
         {
@@ -503,7 +557,11 @@ def build_career_tree(
         "total_skills": len(current_skills),
         "branch_comparison": [_branch_comparison_row(b) for b in branches],
         "next_level_readiness": _next_level_readiness(
-            current_skills, experience, best_seg
+            current_skills,
+            experience,
+            best_seg,
+            match_cache,
+            top_skills_cache,
         ),
         "career_narrative": _career_narrative(
             branches, steps, len(current_skills), best_seg

@@ -31,6 +31,7 @@ import {
   UserProfile,
   segmentInsightKey,
 } from "../types";
+import { matchableProfileSkills } from "../profileSkills";
 
 interface CareerPathViewProps {
   profileData: UserProfile | null;
@@ -105,7 +106,12 @@ export function CareerPathView({
   const prevDepthRef = useRef(0);
 
   const isVirtual = profileMode === "virtual";
-  const activeSkills = isVirtual ? virtualProfile.hard_skills : selectedSkills;
+  const profileSkills = matchableProfileSkills(profileData?.hard_skills);
+  const activeSkills = isVirtual
+    ? virtualProfile.hard_skills
+    : profileSkills.length > 0
+      ? profileSkills
+      : selectedSkills;
   const activeExperience: ExperienceItem[] = isVirtual
     ? virtualProfile.experience
     : profileData?.experience || [];
@@ -328,6 +334,10 @@ export function CareerPathView({
   const narrative = tree?.career_narrative;
   const stepsCount = activeCareerPath.steps?.length ?? 0;
   const hasSkills = skillIds.length > 0;
+  const experienceMonths = activeExperience.reduce(
+    (sum, e) => sum + (e.duration_months || 0),
+    0
+  );
   const emptyProfile = !hasSkills && stepsCount === 0;
 
   return (
@@ -428,6 +438,7 @@ export function CareerPathView({
           readiness={tree.next_level_readiness}
           segmentInsights={segmentInsights}
           insightsLoading={insightsLoading}
+          experienceMonths={experienceMonths}
         />
       )}
 

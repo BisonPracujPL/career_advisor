@@ -23,11 +23,23 @@ def _skill_names(profile_data: dict) -> list[str]:
 
 
 def _skill_ids(profile_data: dict) -> list[str]:
-    return [
-        str(s["id"])
-        for s in (profile_data.get("hard_skills") or [])
-        if s.get("id")
-    ]
+    from apps.job_market.models import Skill
+
+    ids: list[str] = []
+    for s in profile_data.get("hard_skills") or []:
+        if not isinstance(s, dict):
+            continue
+        sid = s.get("id")
+        if sid:
+            ids.append(str(sid))
+            continue
+        name = (s.get("name") or "").strip()
+        if not name:
+            continue
+        row = Skill.objects.filter(is_category=False, name__iexact=name).first()
+        if row:
+            ids.append(str(row.id))
+    return ids
 
 
 def _experience_summary(experience: list) -> str:

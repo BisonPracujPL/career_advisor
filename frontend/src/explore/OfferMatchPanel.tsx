@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { SkillMetricsBar } from "./SkillMetricsBar";
 
 export interface MatchSkill {
@@ -14,6 +15,7 @@ interface OfferMatchPanelProps {
   missing: MatchSkill[];
   onAdd: (skill: MatchSkill) => void;
   onRemove: (skillId: string) => void;
+  sessionBanner?: ReactNode;
 }
 
 function SkillChip({
@@ -55,13 +57,15 @@ export function OfferMatchPanel({
   missing,
   onAdd,
   onRemove,
+  sessionBanner,
 }: OfferMatchPanelProps) {
   return (
     <section className="explore-card explore-card--match">
       <h3>Dopasowanie</h3>
+      {sessionBanner}
       <p className="muted explore-hint">
-        Kliknij kompetencje z tej oferty — dodaj z „Brakuje” lub usuń z „Spełniasz”. Procent przy
-        skillu to udział w profilu wymagań oferty (znormalizowany).
+        Kliknij „+” — skill trafia do symulacji (sesja). Procent przy skillu to udział w
+        wymaganiach tej oferty.
       </p>
       <SkillMetricsBar
         matchLabel="dopasowanie do oferty"

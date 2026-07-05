@@ -1,4 +1,5 @@
 import { OfferDetail, SegmentKey, Skill } from "../types";
+import { SkillSessionBanner } from "../components/SkillSessionBanner";
 import { OfferMatchPanel } from "./OfferMatchPanel";
 import { SegmentOffersList } from "./SegmentOffersList";
 import { ExploreBackButton } from "./ExploreBackButton";
@@ -10,6 +11,10 @@ interface OfferDetailViewProps {
   selectedSkills: Skill[];
   onAddSkill: (skill: Skill) => void;
   onRemoveSkill: (skillId: string) => void;
+  skillsDirty?: boolean;
+  skillsSaving?: boolean;
+  onSaveSkills?: () => void | Promise<void>;
+  onResetSkills?: () => void;
   onBack: () => void;
   onOpenSegment: (segment: SegmentKey) => void;
   onOpenOffer: (offerId: number | string) => void;
@@ -37,6 +42,10 @@ export function OfferDetailView({
   selectedSkills,
   onAddSkill,
   onRemoveSkill,
+  skillsDirty = false,
+  skillsSaving = false,
+  onSaveSkills,
+  onResetSkills,
   onBack,
   onOpenSegment,
   onOpenOffer,
@@ -143,6 +152,16 @@ export function OfferDetailView({
         missing={missing}
         onAdd={(s) => onAddSkill({ id: s.id, name: s.name })}
         onRemove={onRemoveSkill}
+        sessionBanner={
+          onSaveSkills && onResetSkills ? (
+            <SkillSessionBanner
+              dirty={skillsDirty}
+              saving={skillsSaving}
+              onSave={onSaveSkills}
+              onReset={onResetSkills}
+            />
+          ) : null
+        }
       />
 
       <section className="explore-card explore-card--prose">

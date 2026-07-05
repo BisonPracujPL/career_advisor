@@ -2,17 +2,24 @@
 
 from __future__ import annotations
 
+import os
+from concurrent.futures import ThreadPoolExecutor
+
+from django.db import close_old_connections
 from django.db.models import Count, Q
 
 from apps.job_market.models import JobOffer
 from apps.job_market.services.pillar_labels import segment_display_label
 from apps.job_market.services.segment_analytics import (
+    SegmentMatchCache,
     _enrich_skill_pcts,
     _salary_stats,
     _segment_match_score,
     _skill_fit,
     _top_skills_in_segment,
 )
+
+SCORE_WORKERS = min(8, max(2, (os.cpu_count() or 4)))
 
 MIN_SEGMENT_SIZE = 25
 MAX_CANDIDATES = 80
@@ -70,12 +77,62 @@ def top_segment_without_skills(industries: list | None = None) -> dict | None:
     }
 
 
+def _score_segment_candidate(
+    row: dict,
+    skill_ids: list[str],
+    *,
+    fast: bool,
+    match_limit: int,
+    match_cache: SegmentMatchCache | None,
+) -> dict:
+    close_old_connections()
+    lead_main = row["lead_main_category"]
+    lead_sub = row["lead_sub_category"]
+    size = row["offer_count"]
+    match = (
+        _segment_match_score(
+            skill_ids,
+            lead_main,
+            lead_sub,
+            match_limit=match_limit,
+            match_cache=match_cache,
+        )
+        or {}
+    )
+    entry = {
+        "lead_main_category": lead_main,
+        "lead_sub_category": lead_sub,
+        "display_label": segment_display_label(lead_main, lead_sub),
+        "offer_count": size,
+        "match_pct": match.get("avg_similarity_pct", 0),
+    }
+    if not fast:
+        top_skills = _enrich_skill_pcts(_top_skills_in_segment(lead_main, lead_sub), size)
+        fit = _skill_fit(skill_ids, top_skills)
+        qs = JobOffer.objects.filter(
+            lead_main_category=lead_main,
+            lead_sub_category=lead_sub,
+        )
+        sal_uop = _salary_stats(qs.filter(salary_uop_duration__icontains="mies"), "uop")
+        entry["skill_coverage_pct"] = fit["coverage_pct"]
+        entry["top_missing_skills"] = fit["missing"][:5]
+        entry["median_salary_uop"] = sal_uop["median"] if sal_uop else None
+    else:
+        entry["skill_coverage_pct"] = 0
+        entry["top_missing_skills"] = []
+        entry["median_salary_uop"] = None
+    return entry
+
+
 def rank_segments_for_profile(
     skill_ids: list[str],
     industries: list | None = None,
     limit: int = 15,
     max_candidates: int = MAX_CANDIDATES,
     fast: bool = False,
+    match_limit: int = 60,
+    match_cache: SegmentMatchCache | None = None,
+    parallel: bool = False,
 ) -> list[dict]:
     if not skill_ids:
         return []
@@ -92,35 +149,32 @@ def rank_segments_for_profile(
         .order_by("-offer_count")[:max_candidates]
     )
 
-    ranked: list[dict] = []
-    for row in candidates:
-        lead_main = row["lead_main_category"]
-        lead_sub = row["lead_sub_category"]
-        size = row["offer_count"]
-        match = _segment_match_score(skill_ids, lead_main, lead_sub) or {}
-        entry = {
-            "lead_main_category": lead_main,
-            "lead_sub_category": lead_sub,
-            "display_label": segment_display_label(lead_main, lead_sub),
-            "offer_count": size,
-            "match_pct": match.get("avg_similarity_pct", 0),
-        }
-        if not fast:
-            top_skills = _enrich_skill_pcts(_top_skills_in_segment(lead_main, lead_sub), size)
-            fit = _skill_fit(skill_ids, top_skills)
-            qs = JobOffer.objects.filter(
-                lead_main_category=lead_main,
-                lead_sub_category=lead_sub,
+    if parallel and len(candidates) > 1:
+        workers = min(SCORE_WORKERS, len(candidates))
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            ranked = list(
+                pool.map(
+                    lambda row: _score_segment_candidate(
+                        row,
+                        skill_ids,
+                        fast=fast,
+                        match_limit=match_limit,
+                        match_cache=match_cache,
+                    ),
+                    candidates,
+                )
             )
-            sal_uop = _salary_stats(qs.filter(salary_uop_duration__icontains="mies"), "uop")
-            entry["skill_coverage_pct"] = fit["coverage_pct"]
-            entry["top_missing_skills"] = fit["missing"][:5]
-            entry["median_salary_uop"] = sal_uop["median"] if sal_uop else None
-        else:
-            entry["skill_coverage_pct"] = 0
-            entry["top_missing_skills"] = []
-            entry["median_salary_uop"] = None
-        ranked.append(entry)
+    else:
+        ranked = [
+            _score_segment_candidate(
+                row,
+                skill_ids,
+                fast=fast,
+                match_limit=match_limit,
+                match_cache=match_cache,
+            )
+            for row in candidates
+        ]
 
     ranked.sort(
         key=lambda x: (

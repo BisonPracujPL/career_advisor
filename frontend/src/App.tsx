@@ -1,14 +1,16 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
 import Auth from "./Auth";
 import UserProfileWizard from "./UserProfileWizard";
 import { Navbar } from "./components/Navbar";
+import { SkillSessionBanner } from "./components/SkillSessionBanner";
 import { MultiSelect, Collapse, Chip } from "./components/ui";
 import { OfferCard } from "./components/OfferCard";
 import { ChatAdvisor } from "./components/ChatAdvisor";
 import { OfferDetailView } from "./explore/OfferDetailView";
 import { SegmentAnalyticsView } from "./explore/SegmentAnalyticsView";
 import { CareerPathView } from "./career/CareerPathView";
+import { matchableProfileSkills } from "./profileSkills";
 import {
   CareerPathStep,
   Filters,
@@ -22,7 +24,8 @@ import {
 } from "./types";
 
 export default function App() {
-  const [mode, setMode] = useState("skills");
+  const [mode, setMode] = useState("search");
+  const [searchMatchMode, setSearchMatchMode] = useState<"profile" | "similar">("profile");
   const [filterOpts, setFilterOpts] = useState<any>(null);
   const [pillars, setPillars] = useState<any[]>([]);
   const [segments, setSegments] = useState<any[]>([]);
@@ -72,28 +75,86 @@ export default function App() {
   const [isProfileLoading, setIsProfileLoading] = useState(false);
   const [profileData, setProfileData] = useState<UserProfile | null>(null);
   const [showProfileWizard, setShowProfileWizard] = useState(false);
+  const [skillsSaving, setSkillsSaving] = useState(false);
+  const skillsSeededRef = useRef(false);
+
+  const skillsSignature = useCallback(
+    (skills: Skill[]) =>
+      [...skills]
+        .map((s) => String(s.id))
+        .sort()
+        .join("|"),
+    []
+  );
+
+  const profileSkillSig = useMemo(
+    () => skillsSignature(matchableProfileSkills(profileData?.hard_skills)),
+    [profileData, skillsSignature]
+  );
+  const sessionSkillSig = useMemo(
+    () => skillsSignature(selectedSkills),
+    [selectedSkills, skillsSignature]
+  );
+  const skillsDirty = profileSkillSig !== sessionSkillSig;
 
   useEffect(() => {
     if (isLoggedIn) {
       setIsProfileLoading(true);
-      api.getProfile().then((d) => {
-        const hasData = !!d.profile_data && Object.keys(d.profile_data).length > 0;
-        setHasProfile(hasData);
-        if (hasData) {
-          setProfileData(d.profile_data);
-        }
-      }).catch(() => {
-        setIsLoggedIn(false);
-        localStorage.removeItem("auth_token");
-        setShowAuth(true);
-      }).finally(() => {
-        setIsProfileLoading(false);
-      });
+      api
+        .getProfile()
+        .then(async (d) => {
+          const hasData = !!d.profile_data && Object.keys(d.profile_data).length > 0;
+          setHasProfile(hasData);
+          if (!hasData) return;
+
+          let profile = d.profile_data as UserProfile;
+          const rawSkills = profile.hard_skills || [];
+          if (rawSkills.length) {
+            const resolved = await api.resolveProfileSkills(rawSkills);
+            if (resolved.updated) {
+              profile = { ...profile, hard_skills: resolved.skills };
+              try {
+                const saved = await api.saveProfile(profile);
+                profile = saved.profile_data as UserProfile;
+              } catch {
+                /* użyj lokalnie uzupełnionych id */
+              }
+            }
+          }
+
+          setProfileData(profile);
+          const matchable = matchableProfileSkills(profile.hard_skills);
+          if (matchable.length) {
+            setSelectedSkills(matchable);
+            skillsSeededRef.current = true;
+          }
+        })
+        .catch(() => {
+          setIsLoggedIn(false);
+          localStorage.removeItem("auth_token");
+          setShowAuth(true);
+        })
+        .finally(() => {
+          setIsProfileLoading(false);
+        });
     } else {
       setHasProfile(false);
       setIsProfileLoading(false);
     }
   }, [isLoggedIn, showProfileWizard]);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      skillsSeededRef.current = false;
+      return;
+    }
+    if (!profileData?.hard_skills?.length || skillsSeededRef.current) return;
+    const matchable = matchableProfileSkills(profileData.hard_skills);
+    if (matchable.length) {
+      setSelectedSkills(matchable);
+      skillsSeededRef.current = true;
+    }
+  }, [isLoggedIn, profileData]);
 
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -173,9 +234,9 @@ export default function App() {
 
   useEffect(() => {
     if (mode !== "path" || !profileData?.hard_skills?.length) return;
+    const fromProfile = matchableProfileSkills(profileData.hard_skills);
+    if (!fromProfile.length) return;
     setSelectedSkills((prev) => {
-      const fromProfile = profileData.hard_skills.filter((s) => s.id);
-      if (!fromProfile.length) return prev;
       const merged = [...prev];
       for (const s of fromProfile) {
         if (!merged.some((m) => String(m.id) === String(s.id))) {
@@ -188,7 +249,7 @@ export default function App() {
 
   const addSkill = useCallback((skill: Skill) => {
     setSelectedSkills((prev) =>
-      prev.some((s) => s.id === skill.id) ? prev : [...prev, skill]
+      prev.some((s) => String(s.id) === String(skill.id)) ? prev : [...prev, skill]
     );
     setSkillQuery("");
     setSkillHits([]);
@@ -198,27 +259,38 @@ export default function App() {
     setSelectedSkills((prev) => prev.filter((s) => String(s.id) !== skillId));
   }, []);
 
-  const persistProfileSkill = useCallback(
-    async (skill: Skill) => {
-      setSelectedSkills((prev) =>
-        prev.some((s) => String(s.id) === String(skill.id)) ? prev : [...prev, skill]
-      );
-      const base: UserProfile = profileData || {
-        experience: [],
-        education: [],
-        hard_skills: [],
-        languages: [],
-        interested_industries: [],
-      };
-      const hard_skills = base.hard_skills || [];
-      if (hard_skills.some((s) => String(s.id) === String(skill.id))) return;
-      const next = { ...base, hard_skills: [...hard_skills, skill] };
+  const saveSkillsToProfile = useCallback(async () => {
+    const base: UserProfile = profileData || {
+      experience: [],
+      education: [],
+      hard_skills: [],
+      languages: [],
+      interested_industries: [],
+    };
+    setSkillsSaving(true);
+    setError("");
+    try {
+      const next = { ...base, hard_skills: selectedSkills };
       const data = await api.saveProfile(next);
       setProfileData(data.profile_data);
       setHasProfile(true);
-    },
-    [profileData]
-  );
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSkillsSaving(false);
+    }
+  }, [profileData, selectedSkills]);
+
+  const resetSkillsFromProfile = useCallback(() => {
+    setSelectedSkills(matchableProfileSkills(profileData?.hard_skills));
+  }, [profileData]);
+
+  const skillSessionProps = {
+    skillsDirty,
+    skillsSaving,
+    onSaveSkills: saveSkillsToProfile,
+    onResetSkills: resetSkillsFromProfile,
+  };
 
   const takeCareerBranch = useCallback(
     async (skills: Skill[], step: CareerPathStep) => {
@@ -460,6 +532,15 @@ export default function App() {
 
   const levelGroups = filterOpts?.position_level_groups || [];
 
+  const switchSearchMatchMode = (next: "profile" | "similar") => {
+    if (next === searchMatchMode) return;
+    setSearchMatchMode(next);
+    setOffers([]);
+    setResultMeta(null);
+    setError("");
+    setSeedOffer(null);
+  };
+
   const handleLogout = () => {
     localStorage.removeItem("auth_token");
     setIsLoggedIn(false);
@@ -539,6 +620,7 @@ export default function App() {
                 selectedSkills={selectedSkills}
                 onAddSkill={addSkill}
                 onRemoveSkill={removeSkill}
+                {...skillSessionProps}
                 onBack={() => {
                   if (exploreBack === "segment" && segmentData) {
                     setExploreView("segment");
@@ -586,6 +668,7 @@ export default function App() {
                 onApplyFilters={applySegmentFilters}
                 onAddSkill={addSkill}
                 onRemoveSkill={removeSkill}
+                {...skillSessionProps}
                 onBack={() => {
                   if (exploreBack === "offer" && offerDetail) {
                     setExploreView("offer");
@@ -739,6 +822,35 @@ export default function App() {
 
           <div className="workspace">
             <aside className="panel panel-side">
+              <div className="search-mode-toggle" role="tablist" aria-label="Tryb dopasowania ofert">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={searchMatchMode === "profile"}
+                  className={
+                    searchMatchMode === "profile"
+                      ? "search-mode-toggle__btn active"
+                      : "search-mode-toggle__btn"
+                  }
+                  onClick={() => switchSearchMatchMode("profile")}
+                >
+                  Po profilu kompetencji
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={searchMatchMode === "similar"}
+                  className={
+                    searchMatchMode === "similar"
+                      ? "search-mode-toggle__btn active"
+                      : "search-mode-toggle__btn"
+                  }
+                  onClick={() => switchSearchMatchMode("similar")}
+                >
+                  Po podobnym stanowisku
+                </button>
+              </div>
+
               <Collapse title="Branża — pełna lista z bazy" defaultOpen={false}>
                 <label className="field">
                   <span className="field-label">Konkretna branża (lead_main)</span>
@@ -763,8 +875,14 @@ export default function App() {
                 </label>
               </Collapse>
 
-              {mode === "skills" && (
+              {searchMatchMode === "profile" && (
                 <Collapse title="Twój profil kompetencji" defaultOpen>
+                  <SkillSessionBanner
+                    dirty={skillsDirty}
+                    saving={skillsSaving}
+                    onSave={saveSkillsToProfile}
+                    onReset={resetSkillsFromProfile}
+                  />
                   <label className="field">
                     <span className="field-label">Szukaj kompetencji</span>
                     <input
@@ -855,7 +973,7 @@ export default function App() {
                 </Collapse>
               )}
 
-              {mode === "job" && (
+              {searchMatchMode === "similar" && (
                 <Collapse title="Wzorzec stanowiska" defaultOpen>
                   <label className="field">
                     <span className="field-label">Tytuł oferty</span>
@@ -897,7 +1015,7 @@ export default function App() {
               <div className="results-head">
                 <div>
                   <h2>Rekomendowane oferty</h2>
-                  {resultMeta?.count > 0 && mode === "skills" && (
+                  {resultMeta?.count > 0 && searchMatchMode === "profile" && (
                     <p className="results-sub muted">
                       Posortowane wg cosine na wektorach TF-IDF (rzadsze skille ważą
                       więcej). Pierścień = dopasowanie, pasek = pokrycie wymagań oferty.
@@ -927,7 +1045,7 @@ export default function App() {
                   <div className="empty-icon">◎</div>
                   <h3>Zacznij od profilu lub wzorca</h3>
                   <p>
-                    {mode === "skills"
+                    {searchMatchMode === "profile"
                       ? "Wybierz kompetencje i kliknij „Dopasuj oferty pracy”."
                       : "Wyszukaj tytuł stanowiska i wybierz ofertę z listy."}
                   </p>

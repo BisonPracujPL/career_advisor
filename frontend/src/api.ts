@@ -53,6 +53,11 @@ export const api = {
   filterOptions: (): Promise<any> => request("/api/v1/filters/options/"),
   searchSkills: (q: string): Promise<any> =>
     request(`/api/v1/skills/search/?q=${encodeURIComponent(q)}&limit=20`),
+  resolveProfileSkills: (skills: { id?: string; name: string }[]): Promise<{ skills: any[]; updated: boolean }> =>
+    request("/api/v1/skills/resolve/", {
+      method: "POST",
+      body: JSON.stringify({ skills }),
+    }),
   recommendSkills: (skills: string[]): Promise<any> =>
     request("/api/v1/skills/recommend/", {
       method: "POST",

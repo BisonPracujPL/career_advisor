@@ -12,6 +12,7 @@ urlpatterns = [
         views.SkillSubcategoriesView.as_view(),
     ),
     path("skills/browse/", views.SkillBrowseView.as_view()),
+    path("skills/resolve/", views.SkillResolveView.as_view()),
     path("market/pillars/", views.MarketPillarsView.as_view()),
     path(
         "market/pillars/<str:pillar_id>/segments/",
