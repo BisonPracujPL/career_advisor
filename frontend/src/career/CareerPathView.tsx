@@ -3,22 +3,24 @@ import { api } from "../api";
 import { CareerTrajectorySummary } from "./CareerCompareCharts";
 import {
   CareerProfileModeToggle,
-  CareerVirtualBanner,
   CareerProfileMode,
 } from "./CareerProfileModeToggle";
 import {
   emptyVirtualProfile,
   loadVirtualProfile,
   mergeSkills,
+  revertVirtualPathToCheckpoint,
   saveVirtualProfile,
   virtualFromReal,
   VirtualCareerProfile,
 } from "./careerVirtualProfile";
 import { NextLevelReadinessCard } from "./NextLevelCard";
+import { VirtualProfilePanel } from "./VirtualProfilePanel";
 import {
   CareerComparisonSection,
   CareerTreeCanvas,
   CareerTreePanel,
+  findNodeInTree,
 } from "./CareerRoadmap";
 import {
   CareerPathStep,
@@ -81,6 +83,32 @@ function collectSegments(tree: CareerTree) {
   return segments;
 }
 
+function patchTreeForVirtualProfile(tree: CareerTree, activeSkills: Skill[]): CareerTree {
+  const skillIds = activeSkills
+    .map((s) => String(s.id))
+    .filter((id) => id && id !== "undefined");
+  const levels = tree.levels.map((level, idx) => {
+    const isActiveLevel = idx === tree.levels.length - 1;
+    if (!isActiveLevel || !level.state) return level;
+    const matchPct = level.state.match_pct ?? tree.best_segment?.match_pct ?? 0;
+    return {
+      ...level,
+      state: {
+        ...level.state,
+        title: "Twój wirtualny stan",
+        skill_ids: skillIds,
+        skills: activeSkills,
+        subtitle: `${activeSkills.length} kompetencji · najlepsze dopasowanie ${matchPct}%`,
+      },
+    };
+  });
+  return {
+    ...tree,
+    total_skills: activeSkills.length,
+    levels,
+  };
+}
+
 export function CareerPathView({
   profileData,
   selectedSkills,
@@ -128,14 +156,17 @@ export function CareerPathView({
       experience: activeExperience,
       career_path: activeCareerPath,
       interested_industries: activeIndustries,
-      education: profileData?.education || [],
-      languages: profileData?.languages || [],
+      education: isVirtual ? virtualProfile.education : profileData?.education || [],
+      languages: isVirtual ? virtualProfile.languages : profileData?.languages || [],
     }),
     [
       activeSkills,
       activeExperience,
       activeCareerPath,
       activeIndustries,
+      isVirtual,
+      virtualProfile.education,
+      virtualProfile.languages,
       profileData?.education,
       profileData?.languages,
     ]
@@ -148,7 +179,14 @@ export function CareerPathView({
   const careerPathKey = JSON.stringify(activeCareerPath);
   const skillIdsKey = skillIds.join("|");
   const experienceKey = JSON.stringify(activeExperience);
+  const industriesKey = JSON.stringify(activeIndustries);
   const modeKey = profileMode;
+
+  const displayTree = useMemo((): CareerTree | null => {
+    if (!tree) return null;
+    if (!isVirtual) return tree;
+    return patchTreeForVirtualProfile(tree, activeSkills);
+  }, [tree, isVirtual, activeSkills]);
 
   useEffect(() => {
     if (isVirtual) {
@@ -187,10 +225,13 @@ export function CareerPathView({
         )
         .then((data) => {
           setTree(data);
-          if (!isRefresh) {
-            const active = data.levels[data.levels.length - 1]?.state;
-            setSelectedNode(active || null);
-          }
+          setSelectedNode((prev) => {
+            if (prev) {
+              const resolved = findNodeInTree(data, prev.id);
+              if (resolved) return resolved;
+            }
+            return data.levels[data.levels.length - 1]?.state || null;
+          });
           void loadInsights(data);
         })
         .catch((e) => {
@@ -210,7 +251,7 @@ export function CareerPathView({
   useEffect(() => {
     loadTree(mountedRef.current);
     mountedRef.current = true;
-  }, [skillIdsKey, careerPathKey, experienceKey, modeKey, loadTree]);
+  }, [skillIdsKey, careerPathKey, experienceKey, industriesKey, modeKey, loadTree]);
 
   useEffect(() => {
     if (!loading) return;
@@ -262,6 +303,15 @@ export function CareerPathView({
       return;
     }
     setVirtualProfile(emptyVirtualProfile());
+  };
+
+  const handleRevertToCheckpoint = (stepsToKeep: number) => {
+    if (!isVirtual) return;
+    const currentSteps = virtualProfile.career_path?.steps?.length ?? 0;
+    if (stepsToKeep < 0 || stepsToKeep >= currentSteps) return;
+
+    setVirtualProfile((prev) => revertVirtualPathToCheckpoint(prev, stepsToKeep));
+    prevDepthRef.current = Math.max(0, stepsToKeep);
   };
 
   const handleTakeBranch = async (branch: TreeBranchNode) => {
@@ -358,11 +408,11 @@ export function CareerPathView({
                   ? "Profil wirtualny — testuj ścieżki i pakiety skilli bez zmiany prawdziwego profilu."
                   : "Dynamiczne drzewko oparte na TF-IDF — każda gałąź realnie podnosi dopasowanie do segmentu rynku."}
             </p>
-            {tree && (
+            {displayTree && (
               <CareerTrajectorySummary
                 stepsCount={stepsCount}
-                totalSkills={tree.total_skills}
-                bestMatch={tree.best_segment?.match_pct ?? 0}
+                totalSkills={displayTree.total_skills}
+                bestMatch={displayTree.best_segment?.match_pct ?? 0}
                 goalLabel={narrative?.goal_label}
               />
             )}
@@ -383,8 +433,9 @@ export function CareerPathView({
       </header>
 
       {isVirtual && (
-        <CareerVirtualBanner
-          skillCount={activeSkills.length}
+        <VirtualProfilePanel
+          profile={virtualProfile}
+          onChange={setVirtualProfile}
           onCopyFromReal={handleCopyFromReal}
           onResetVirtual={handleResetVirtual}
         />
@@ -442,7 +493,7 @@ export function CareerPathView({
         />
       )}
 
-      {tree && (
+      {displayTree && (
         <>
           <div className="roadmap-layout roadmap-layout--wide">
             <div className="roadmap-canvas-wrap panel" ref={canvasWrapRef}>
@@ -453,25 +504,27 @@ export function CareerPathView({
                 </div>
               )}
               <CareerTreeCanvas
-                data={tree}
+                data={displayTree}
                 selectedNode={selectedNode}
                 unlockingId={unlockingId}
                 onSelectNode={setSelectedNode}
               />
             </div>
             <CareerTreePanel
-              data={tree}
+              data={displayTree}
               selectedNode={selectedNode}
               segmentInsights={segmentInsights}
               insightsLoading={insightsLoading}
               takingBranch={takingBranch}
               profileForVision={profileForVision}
               onTakeBranch={handleTakeBranch}
+              isVirtual={isVirtual}
+              onRevertToCheckpoint={isVirtual ? handleRevertToCheckpoint : undefined}
             />
           </div>
 
           <CareerComparisonSection
-            data={tree}
+            data={displayTree}
             segmentInsights={segmentInsights}
             insightsLoading={insightsLoading}
             selectedNode={selectedNode}

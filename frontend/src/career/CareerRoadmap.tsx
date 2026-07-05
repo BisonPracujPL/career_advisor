@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Chip } from "../components/ui";
 import { BranchVisionPanel } from "./BranchVisionPanel";
+import { getCheckpointRevertOption } from "./careerPathCheckpoint";
 import { CareerOptionMatrix } from "./CareerOptionMatrix";
 import {
   CareerTree,
@@ -20,6 +21,15 @@ const CANVAS_WIDTH = 960;
 const CANVAS_CENTER = CANVAS_WIDTH / 2;
 const LEVEL_HEIGHT = 300;
 const BRANCH_Y_OFFSET = 108;
+
+export function findNodeInTree(data: CareerTree, nodeId: string): TreeNode | null {
+  for (const level of data.levels) {
+    if (level.state?.id === nodeId) return level.state;
+    const branch = level.branches.find((b) => b.id === nodeId);
+    if (branch) return branch;
+  }
+  return null;
+}
 
 function formatPln(n: number | null | undefined) {
   if (n == null) return "—";
@@ -358,6 +368,9 @@ function BranchDetail({
   takingBranch,
   profileForVision,
   onTakeBranch,
+  tree,
+  isVirtual,
+  onRevertToCheckpoint,
 }: {
   branch: TreeBranchNode;
   insight?: SegmentInsight;
@@ -365,8 +378,15 @@ function BranchDetail({
   takingBranch?: boolean;
   profileForVision: UserProfile;
   onTakeBranch: (branch: TreeBranchNode) => void;
+  tree?: CareerTree;
+  isVirtual?: boolean;
+  onRevertToCheckpoint?: (stepsToKeep: number) => void;
 }) {
   const isBundle = branch.branch_type === "bundle" || (branch.skills?.length ?? 0) > 1;
+  const revertOption =
+    isVirtual && tree && onRevertToCheckpoint
+      ? getCheckpointRevertOption(tree, branch)
+      : null;
 
   return (
     <div className="tree-node-detail">
@@ -438,9 +458,24 @@ function BranchDetail({
       )}
 
       {branch.status === "completed" && (
-        <p className="roadmap-detail__hint roadmap-detail__hint--ok">
-          Ten krok masz już za sobą.
-        </p>
+        <>
+          <p className="roadmap-detail__hint roadmap-detail__hint--ok">
+            Ten krok masz już za sobą.
+          </p>
+          {revertOption && (
+            <button
+              type="button"
+              className="btn-secondary roadmap-detail__revert"
+              onClick={() => {
+                if (window.confirm(revertOption.confirmMessage)) {
+                  onRevertToCheckpoint?.(revertOption.stepsToKeep);
+                }
+              }}
+            >
+              {revertOption.label}
+            </button>
+          )}
+        </>
       )}
     </div>
   );
@@ -450,14 +485,27 @@ function StateDetail({
   state,
   segmentInsights,
   insightsLoading,
+  isVirtual,
+  tree,
+  onRevertToCheckpoint,
 }: {
   state: TreeStateNode;
   segmentInsights: Record<string, SegmentInsight>;
   insightsLoading?: boolean;
+  isVirtual?: boolean;
+  tree?: CareerTree;
+  onRevertToCheckpoint?: (stepsToKeep: number) => void;
 }) {
+  const revertOption =
+    isVirtual && tree && onRevertToCheckpoint
+      ? getCheckpointRevertOption(tree, state)
+      : null;
+
   return (
     <div className="tree-node-detail">
-      <p className="tree-node-detail__eyebrow">Twój aktualny stan</p>
+      <p className="tree-node-detail__eyebrow">
+        {isVirtual ? "Twój wirtualny stan" : "Twój aktualny stan"}
+      </p>
       <h3 className="tree-node-detail__title">{state.title}</h3>
       <p className="tree-node-detail__segment">{state.subtitle}</p>
 
@@ -497,6 +545,20 @@ function StateDetail({
             );
           })}
         </div>
+      )}
+
+      {revertOption && (
+        <button
+          type="button"
+          className="btn-secondary roadmap-detail__revert"
+          onClick={() => {
+            if (window.confirm(revertOption.confirmMessage)) {
+              onRevertToCheckpoint?.(revertOption.stepsToKeep);
+            }
+          }}
+        >
+          {revertOption.label}
+        </button>
       )}
     </div>
   );
@@ -542,6 +604,8 @@ export function CareerTreePanel({
   takingBranch,
   profileForVision,
   onTakeBranch,
+  isVirtual,
+  onRevertToCheckpoint,
 }: {
   data: CareerTree;
   selectedNode: TreeNode | null;
@@ -550,9 +614,12 @@ export function CareerTreePanel({
   takingBranch?: boolean;
   profileForVision: UserProfile;
   onTakeBranch: (branch: TreeBranchNode) => void;
+  isVirtual?: boolean;
+  onRevertToCheckpoint?: (stepsToKeep: number) => void;
 }) {
+  const resolved = selectedNode ? findNodeInTree(data, selectedNode.id) : null;
   const active =
-    selectedNode || data.levels[data.levels.length - 1]?.state || null;
+    resolved || data.levels[data.levels.length - 1]?.state || null;
 
   const activeState = active?.kind === "state" ? (active as TreeStateNode) : null;
   const activeBranch = active?.kind === "branch" ? (active as TreeBranchNode) : null;
@@ -583,6 +650,9 @@ export function CareerTreePanel({
           state={activeState}
           segmentInsights={segmentInsights}
           insightsLoading={insightsLoading}
+          isVirtual={isVirtual}
+          tree={data}
+          onRevertToCheckpoint={onRevertToCheckpoint}
         />
       )}
       {activeBranch && (
@@ -593,6 +663,9 @@ export function CareerTreePanel({
           takingBranch={takingBranch}
           profileForVision={profileForVision}
           onTakeBranch={onTakeBranch}
+          tree={data}
+          isVirtual={isVirtual}
+          onRevertToCheckpoint={onRevertToCheckpoint}
         />
       )}
     </aside>
