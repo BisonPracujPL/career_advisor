@@ -86,8 +86,6 @@ export function SkillsProfileEditor({ data, onChange }: { data: Skill[], onChang
     onChange(data.filter((s) => s.name !== name));
   };
 
-  // unused removeMainCategory
-
   const removeSubCategory = (mainCat: string, subCat: string, e: React.MouseEvent) => {
     e.stopPropagation();
     onChange(data.filter(s => !((s.main_category || "Inne") === mainCat && (s.subcategory || "Ogólne") === subCat)));

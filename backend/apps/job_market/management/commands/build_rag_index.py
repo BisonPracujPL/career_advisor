@@ -2,7 +2,7 @@
 Management command: build_rag_index
 
 Extracts text from all PDF reports in the given directory, chunks them,
-embeds with sentence-transformers, and persists into ChromaDB.
+embeds with sentence-transformers, and persists into PostgreSQL (pgvector).
 
 Usage (inside the running container):
     python manage.py build_rag_index
@@ -36,7 +36,7 @@ class Command(BaseCommand):
             "--force",
             action="store_true",
             default=False,
-            help="Delete and rebuild the ChromaDB collection even if it already has data.",
+            help="Delete and rebuild the rag_chunks index even if it already has data.",
         )
 
     def handle(self, *args, **options):

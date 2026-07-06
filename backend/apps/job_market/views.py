@@ -376,7 +376,6 @@ class MatchCandidateJsonView(APIView):
             )
 
         # 2. Sklejenie wartości JSONa (Doświadczenie, skille, opis) w jeden tekst
-        # Możesz to dostosować pod konkretne klucze, jakie mają te JSONy.
         skills = ", ".join(candidate_json.get("skills", []))
         experience = candidate_json.get("experience", "")
         summary = candidate_json.get("summary", "")
@@ -533,7 +532,6 @@ class ChatSuggestionsView(APIView):
         context_text = " ".join([m.get("content", "") for m in recent_messages if isinstance(m, dict)])
         
         from apps.job_market.prompt_suggester import get_top_k_prompts, fill_prompt_variables_with_llm
-        # embedding_model is available globally in views.py
         top_prompts = get_top_k_prompts(context_text, embedding_model, k=4)
         
         profile_data = {}
