@@ -524,16 +524,33 @@ class ChatSuggestionsView(APIView):
     """
     def post(self, request):
         messages = request.data.get("messages", [])
-        
+        last_id = request.data.get("last_suggestion_id")
+        exclude_ids = request.data.get("last_suggestion_ids") or []
+        if not isinstance(exclude_ids, list):
+            exclude_ids = []
+        if last_id:
+            exclude_ids = [str(last_id)]
+        elif exclude_ids:
+            exclude_ids = [str(exclude_ids[-1])]
+
         # Take the last 3 messages to understand the recent context
         recent_messages = messages[-3:] if len(messages) >= 3 else messages
-        
+
         # Combine text of recent messages
         context_text = " ".join([m.get("content", "") for m in recent_messages if isinstance(m, dict)])
-        
-        from apps.job_market.prompt_suggester import get_top_k_prompts, fill_prompt_variables_with_llm
-        top_prompts = get_top_k_prompts(context_text, embedding_model, k=4)
-        
+
+        from apps.job_market.prompt_suggester import (
+            fill_prompt_variables_from_facts,
+            get_top_k_prompts,
+        )
+        top_prompts = get_top_k_prompts(
+            context_text,
+            embedding_model,
+            k=4,
+            exclude_ids=exclude_ids,
+            turn_index=len(messages),
+        )
+
         profile_data = {}
         if request.user and request.user.is_authenticated:
             try:
@@ -541,8 +558,8 @@ class ChatSuggestionsView(APIView):
                 profile_data = profile.profile_data if profile else {}
             except Exception:
                 pass
-                
-        filled_prompts = fill_prompt_variables_with_llm(top_prompts, profile_data, recent_messages)
+
+        filled_prompts = fill_prompt_variables_from_facts(top_prompts, profile_data)
         
         return Response({"suggestions": filled_prompts})
 

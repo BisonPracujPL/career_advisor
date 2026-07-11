@@ -11,7 +11,7 @@ from apps.job_market.services.career_chat_context import (
 )
 from apps.job_market.services.rag_service import retrieve_context
 
-AI_MODEL = "openai/gpt-4o-mini"
+AI_MODEL = "openai/gpt-5.6-terra"
 AI_TEMPERATURE = 0.45
 
 VISION_RAG_INSTRUCTIONS = """

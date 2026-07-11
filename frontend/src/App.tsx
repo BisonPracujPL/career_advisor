@@ -733,9 +733,9 @@ export default function App() {
                 </button>
               </div>
 
-              <Collapse title="Branża — pełna lista z bazy" defaultOpen={false}>
+              <Collapse title="Branża i podkategoria" defaultOpen={false}>
                 <label className="field">
-                  <span className="field-label">Konkretna branża (lead_main)</span>
+                  <span className="field-label">Branża</span>
                   <select
                     className="input"
                     value={filters.lead_main_category}
@@ -747,7 +747,7 @@ export default function App() {
                       }))
                     }
                   >
-                    <option value="">— z podkategorii powyżej lub wszystkie —</option>
+                    <option value="">— wszystkie branże —</option>
                     {(filterOpts?.lead_main_categories || []).map((c: string) => (
                       <option key={c} value={c}>
                         {c}
@@ -784,7 +784,7 @@ export default function App() {
                     </ul>
                   )}
 
-                  <Collapse title="Przeglądaj katalog LightCast" defaultOpen={false}>
+                  <Collapse title="Przeglądaj katalog kompetencji" defaultOpen={false}>
                     <select
                       className="input"
                       value={mainCat}

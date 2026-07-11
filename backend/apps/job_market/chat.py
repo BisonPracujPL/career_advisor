@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import re
 
 from django.http import StreamingHttpResponse, HttpResponseNotAllowed
 from django.views.decorators.csrf import csrf_exempt
@@ -9,8 +10,19 @@ from mcp.client.session import ClientSession
 
 from apps.job_market.services.career_chat_context import (
     CHAT_COURSE_INSTRUCTIONS,
-    build_chat_career_context,
+    CHAT_DATA_RULES,
+    CHAT_RAG_INSTRUCTIONS,
+    CHAT_SALARY_STYLE_INSTRUCTIONS,
+    CHAT_STYLE_INSTRUCTIONS,
+    build_chat_facts,
+    build_chat_rag_query,
     format_chat_context_block,
+    format_chat_facts_json,
+)
+from apps.job_market.services.chat_chart_guard import (
+    apply_chart_guard_for_key,
+    pick_auto_salary_chart,
+    render_radar_chart_url,
 )
 from apps.job_market.services.rag_service import retrieve_context
 
@@ -19,7 +31,7 @@ SERVER_PARAMS = StdioServerParameters(
     args=[]
 )
 
-AI_MODEL = "openai/gpt-4o-mini"
+AI_MODEL = "openai/gpt-5.6-terra"
 
 # Lower temperature → less hallucination, more factual / grounded answers.
 AI_TEMPERATURE = 0.2
@@ -63,6 +75,76 @@ async def _call_mcp_tool(tool_name: str, arguments: dict) -> str:
             return result.content[0].text if result.content else ""
 
 
+def _chart_markdown(mcp_result: str) -> str | None:
+    """MCP returns a bare URL — wrap as markdown image for ReactMarkdown."""
+    text = (mcp_result or "").strip()
+    if not text:
+        return None
+    if text.startswith("!["):
+        return text
+    if text.startswith("http://") or text.startswith("https://"):
+        return f"![]({text})"
+    return None
+
+
+_CHART_MARKDOWN_RE = re.compile(
+    r"!\[[^\]]*\]\(\s*https?://[^\s)]+\s*\)"
+    r"|https?://\S*alipayobjects\.com/\S*",
+    re.IGNORECASE,
+)
+_CHART_JSON_LEAK_RE = re.compile(
+    r"```(?:json)?\s*\[[\s\S]*?\"category\"[\s\S]*?\"value\"[\s\S]*?\]\s*```",
+    re.IGNORECASE,
+)
+_RADAR_JSON_LEAK_RE = re.compile(
+    r"```(?:json)?\s*\[[\s\S]*?\"name\"[\s\S]*?\"value\"[\s\S]*?\]\s*```",
+    re.IGNORECASE,
+)
+_CHART_HTML_IMG_RE = re.compile(
+    r"<img\b[^>]*alipayobjects[^>]*/?\s*>",
+    re.IGNORECASE,
+)
+
+
+def _strip_llm_chart_markdown(text: str, *, chart_key: str | None = None) -> str:
+    """Remove duplicate chart images/URLs and chart-data JSON leaks from LLM output."""
+    if not text:
+        return text
+    cleaned = _CHART_MARKDOWN_RE.sub("", text)
+    cleaned = _CHART_HTML_IMG_RE.sub("", cleaned)
+    cleaned = _CHART_JSON_LEAK_RE.sub("", cleaned)
+    if chart_key == "salary_by_pillar_radar":
+        cleaned = _RADAR_JSON_LEAK_RE.sub("", cleaned)
+    return re.sub(r"\n{3,}", "\n\n", cleaned)
+
+
+def _prioritize_unmentioned_learning_skills(
+    chat_bundle: dict,
+    messages: list[dict],
+) -> None:
+    """Move skills not named in earlier assistant answers to the front."""
+    facts = chat_bundle.get("facts") or {}
+    missing = list(facts.get("missing_skills") or [])
+    if not missing:
+        return
+
+    previous_answers = "\n".join(
+        str(message.get("content") or "").casefold()
+        for message in messages
+        if isinstance(message, dict) and message.get("role") == "assistant"
+    )
+    if not previous_answers:
+        return
+
+    unseen, mentioned = [], []
+    for skill in missing:
+        name = str(skill.get("name") or "").strip()
+        (mentioned if name and name.casefold() in previous_answers else unseen).append(skill)
+
+    if unseen:
+        facts["missing_skills"] = unseen + mentioned
+
+
 from rest_framework.authentication import TokenAuthentication
 
 
@@ -91,41 +173,78 @@ def chat_api(request):
     if body.get("profile_override") and isinstance(body["profile_override"], dict):
         profile_data = {**profile_data, **body["profile_override"]}
 
-    market_ctx = build_chat_career_context(profile_data)
-    context_block = format_chat_context_block(profile_data, market_ctx)
-
-    # ── RAG: retrieve grounding context from indexed market reports ────────────
-    # Use the last user message as the retrieval query for best relevance.
     rag_query = ""
     for m in reversed(messages):
         if m.get("role") == "user" and m.get("content"):
             rag_query = m["content"]
             break
 
-    rag_context = retrieve_context(rag_query) if rag_query else ""
+    chat_bundle = build_chat_facts(profile_data, user_query=rag_query)
+    suggestion_id = body.get("suggestion_id")
+    learning_query = any(
+        phrase in rag_query.casefold()
+        for phrase in ("czego się uczyć", "czego sie uczyc", "skille warto rozwijać")
+    )
+    if suggestion_id in {"learning_first", "skills_courses"} or learning_query:
+        _prioritize_unmentioned_learning_skills(chat_bundle, messages)
+
+    market_ctx = chat_bundle.get("market_ctx") or {}
+    chart_data = chat_bundle.get("chart_data") or {"charts": {}}
+    context_block = format_chat_context_block(profile_data, market_ctx)
+    facts_json = format_chat_facts_json(chat_bundle)
+
+    rag_context = ""
+    if rag_query:
+        rag_context = retrieve_context(build_chat_rag_query(rag_query, market_ctx))
     rag_section = f"\n\n{rag_context}" if rag_context else ""
-    import sys
-    print(f"RAG Query: {rag_query!r}", file=sys.stderr)
-    print(f"RAG Section length: {len(rag_section)}", file=sys.stderr)
-    # ──────────────────────────────────────────────────────────────────────────
+
+    auto_chart_key = pick_auto_salary_chart(
+        rag_query,
+        chart_data,
+        suggestion_id=suggestion_id,
+    )
+    chart_note = ""
+    salary_style_block = ""
+    if auto_chart_key == "salary_by_level_bar":
+        salary_style_block = CHAT_SALARY_STYLE_INSTRUCTIONS
+        chart_note = (
+            "\n\nWykres (auto): serwer na końcu dołączy bar chart — **Twoja odpowiedź to wyłącznie "
+            "2–3 akapity płynnej prozy** (patrz CHAT_SALARY_STYLE). Zero bulletów i list z kwotami."
+        )
+    elif auto_chart_key == "salary_by_pillar_radar":
+        salary_style_block = CHAT_SALARY_STYLE_INSTRUCTIONS
+        chart_note = (
+            "\n\nWykres (auto): serwer na końcu dołączy **dokładnie jeden** wykres radar. "
+            "**Twoja odpowiedź to wyłącznie 2–3 akapity płynnej prozy** porównujące branże "
+            "(kwoty PLN z facts.salary_by_pillar_radar w zdaniach). "
+            "**Zakaz:** obrazków markdown, linków do wykresów, JSON, radarów/wykresów w tekście — "
+            "zero duplikatów; ilustracja tylko od serwera."
+        )
 
     system_prompt = {
         "role": "system",
         "content": (
             "You are a personalized AI career advisor for the Polish job market. "
-            "Respond in Polish. Be concise, practical, and encouraging.\n\n"
+            "Respond in Polish with warm, professional, flowing prose — never dry bullet dumps.\n\n"
             f"User profile (JSON): {json.dumps(profile_data, ensure_ascii=False)}\n\n"
             f"{context_block}\n\n"
+            f"## facts (JSON z bazy — jedyne dozwolone liczby)\n"
+            f"```json\n{facts_json}\n```\n\n"
             f"{rag_section}\n\n"
+            f"{CHAT_DATA_RULES}\n\n"
+            f"{CHAT_STYLE_INSTRUCTIONS}\n\n"
+            f"{salary_style_block}\n\n"
+            f"{CHAT_RAG_INSTRUCTIONS}\n\n"
             "CRITICAL INSTRUCTIONS FOR RAG:\n"
-            "1. When answering questions about the job market, salaries, or trends, YOU MUST BASE YOUR ANSWER ENTIRELY ON THE 'Dokumenty źródłowe' provided above.\n"
-            "2. DO NOT hallucinate or make up salary bands (e.g. Junior/Mid) if they are not explicitly present in the provided reports.\n"
-            "3. If the reports only mention 'Senior', state clearly that you only have data for Senior roles.\n"
-            "4. Always cite the specific report name (e.g., 'Według raportu Antal...').\n\n"
-            f"{CHAT_COURSE_INSTRUCTIONS}\n\n"
-            "Use the profile and market context whenever the user asks about themselves, "
-            "skills, career path, courses, or trends. "
-            "When the user asks for a chart, use available chart tools and embed results as Markdown images."
+            "1. Market trends, demand outlook, and role comparisons — use 'Dokumenty źródłowe' "
+            "and cite report names.\n"
+            "2. Salary numbers only from facts/RAG — never invent PLN or %.\n"
+            "3. Skills, gaps, segment fit — narrative text from facts.\n"
+            "4. Salary charts are appended by the server AFTER your text — write flowing Polish "
+            "prose with PLN figures first, then the chart appears below. Never paste JSON, "
+            "chart specs, markdown images, or chart URLs.\n\n"
+            f"{CHAT_COURSE_INSTRUCTIONS}"
+            f"{chart_note}"
         ),
     }
     full_messages = [system_prompt] + list(messages)
@@ -146,100 +265,53 @@ def chat_api(request):
         )
 
         tools = []
-        try:
-            tools = asyncio.run(_fetch_mcp_tools())
-        except Exception:
-            # Silently proceed without tools if MCP fails
-            pass
 
-        try:
-            first_call_kwargs = {
-                "model": AI_MODEL,
-                "messages": full_messages,
-                "max_tokens": 1500,
-                "temperature": AI_TEMPERATURE,
-            }
-            if tools:
-                first_call_kwargs["tools"] = tools
-
-            response = client.chat.completions.create(**first_call_kwargs)
-            msg = response.choices[0].message
-
-            if msg.tool_calls:
-                tool_results = []
-                charts_to_yield = []
-                for tc in msg.tool_calls:
-                    try:
-                        args = json.loads(tc.function.arguments)
-                        result_text = asyncio.run(
-                            _call_mcp_tool(tc.function.name, args)
+        pre_rendered_chart = None
+        if auto_chart_key:
+            try:
+                safe_args, guard_err, resolved_tool = apply_chart_guard_for_key(
+                    auto_chart_key, chart_data
+                )
+                if safe_args and not guard_err:
+                    if resolved_tool == "generate_radar_chart":
+                        mcp_out = render_radar_chart_url(safe_args)
+                    else:
+                        mcp_out = asyncio.run(
+                            _call_mcp_tool(resolved_tool, safe_args)
                         )
-                        if result_text.startswith("!["):
-                            charts_to_yield.append(result_text)
-                            result_text = "[Chart rendered successfully. User can see the chart now. Provide a brief comment.]"
-                    except Exception as e:
-                        result_text = f"Tool error: {e}"
-                    tool_results.append((tc.id, tc.function.name, result_text))
+                    pre_rendered_chart = _chart_markdown(mcp_out)
+            except Exception as exc:
+                import logging
+                logging.getLogger(__name__).warning("Chart render failed: %s", exc)
 
-                tool_messages = list(full_messages) + [
-                    {
-                        "role": "assistant",
-                        "content": msg.content,
-                        "tool_calls": [
-                            {
-                                "id": tc.id,
-                                "type": "function",
-                                "function": {
-                                    "name": tc.function.name,
-                                    "arguments": tc.function.arguments,
-                                },
-                            }
-                            for tc in msg.tool_calls
-                        ],
-                    }
-                ]
-                for tc_id, tc_name, content in tool_results:
-                    tool_messages.append(
-                        {
-                            "role": "tool",
-                            "tool_call_id": tc_id,
-                            "name": tc_name,
-                            "content": content,
-                        }
-                    )
+        try:
+            stream = client.chat.completions.create(
+                model=AI_MODEL,
+                messages=full_messages,
+                stream=True,
+                max_tokens=1500,
+                temperature=AI_TEMPERATURE,
+            )
+            response_parts = []
+            for chunk in stream:
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta
+                if delta and delta.content:
+                    response_parts.append(delta.content)
 
-                for chart in charts_to_yield:
-                    chart_str = chart + "\n\n"
-                    yield f'0:{json.dumps(chart_str, ensure_ascii=False)}\n'
-
-                stream = client.chat.completions.create(
-                    model=AI_MODEL,
-                    messages=tool_messages,
-                    stream=True,
-                    max_tokens=1500,
-                    temperature=AI_TEMPERATURE,
+            content = "".join(response_parts)
+            if auto_chart_key:
+                content = _strip_llm_chart_markdown(
+                    content,
+                    chart_key=auto_chart_key,
                 )
-                for chunk in stream:
-                    if not chunk.choices:
-                        continue
-                    delta = chunk.choices[0].delta
-                    if delta and delta.content:
-                        yield f'0:{json.dumps(delta.content, ensure_ascii=False)}\n'
+            if content:
+                yield f'0:{json.dumps(content, ensure_ascii=False)}\n'
 
-            else:
-                stream = client.chat.completions.create(
-                    model=AI_MODEL,
-                    messages=full_messages,
-                    stream=True,
-                    max_tokens=1500,
-                    temperature=AI_TEMPERATURE,
-                )
-                for chunk in stream:
-                    if not chunk.choices:
-                        continue
-                    delta = chunk.choices[0].delta
-                    if delta and delta.content:
-                        yield f'0:{json.dumps(delta.content, ensure_ascii=False)}\n'
+            if pre_rendered_chart:
+                chart_str = f"\n\n{pre_rendered_chart}\n\n"
+                yield f'0:{json.dumps(chart_str, ensure_ascii=False)}\n'
 
         except Exception as e:
             err = f"Błąd: {str(e)}"

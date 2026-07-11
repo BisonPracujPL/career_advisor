@@ -20,12 +20,22 @@ function formatSalary(contract: "UoP" | "B2B", block: OfferDetail["salary_uop"])
   return formatOfferSalaryLine(contract, block);
 }
 
+function cleanOfferText(text: string): string {
+  return text
+    .trim()
+    .replace(
+      /^(?:expected|your responsibilities|optional|requirements|wymagania|obowiązki)\s*,\s*/i,
+      "",
+    );
+}
+
 function TextBlock({ title, text }: { title: string; text: string }) {
   if (!text.trim()) return null;
+  const cleanedText = cleanOfferText(text);
   return (
     <article className="prose-block">
       <h4>{title}</h4>
-      <p>{text}</p>
+      <p>{cleanedText}</p>
     </article>
   );
 }

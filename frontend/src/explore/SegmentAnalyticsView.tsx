@@ -90,7 +90,7 @@ export function SegmentAnalyticsView({
               ))}
             </select>
           </label>
-          <div className="field">
+          <div>
             <MultiSelect
               label="Poziom stanowiska"
               placeholder="Dowolny poziom"

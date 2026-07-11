@@ -19,6 +19,30 @@ interface Suggestion {
 }
 
 const SESSION_KEY = 'chat_advisor_messages';
+const LAST_SUGGESTION_KEY = 'chat_advisor_last_suggestion';
+
+function loadLastClickedSuggestionId(): string | null {
+  try {
+    const raw = sessionStorage.getItem(LAST_SUGGESTION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return typeof parsed === 'string' && parsed ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistLastClickedSuggestionId(id: string | null) {
+  try {
+    if (id) {
+      sessionStorage.setItem(LAST_SUGGESTION_KEY, JSON.stringify(id));
+    } else {
+      sessionStorage.removeItem(LAST_SUGGESTION_KEY);
+    }
+  } catch {
+    // ignore
+  }
+}
 
 const SuggestionIcon = ({ name }: { name: string }) => {
   switch (name) {
@@ -69,6 +93,9 @@ export function ChatAdvisor() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [lastClickedSuggestionId, setLastClickedSuggestionId] = useState<string | null>(
+    () => loadLastClickedSuggestionId(),
+  );
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -85,7 +112,10 @@ export function ChatAdvisor() {
     persistMessages(messages);
   }, [messages]);
 
-  const fetchSuggestions = useCallback(async (currentMessages: ChatMessage[]) => {
+  const fetchSuggestions = useCallback(async (
+    currentMessages: ChatMessage[],
+    lastId: string | null,
+  ) => {
     try {
       const res = await fetch('/api/v1/chat/suggestions/', {
         method: 'POST',
@@ -93,7 +123,10 @@ export function ChatAdvisor() {
           'Content-Type': 'application/json',
           'Authorization': `Token ${localStorage.getItem('auth_token') || ''}`,
         },
-        body: JSON.stringify({ messages: currentMessages }),
+        body: JSON.stringify({
+          messages: currentMessages,
+          last_suggestion_id: lastId,
+        }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -106,9 +139,9 @@ export function ChatAdvisor() {
 
   useEffect(() => {
     if (!isLoading) {
-      fetchSuggestions(messages);
+      fetchSuggestions(messages, lastClickedSuggestionId);
     }
-  }, [isLoading, messages, fetchSuggestions]);
+  }, [isLoading, messages, lastClickedSuggestionId, fetchSuggestions]);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -121,17 +154,29 @@ export function ChatAdvisor() {
   const handleNewConversation = useCallback(() => {
     setMessages([]);
     setSuggestions([]);
+    setLastClickedSuggestionId(null);
     setError(null);
     try {
       sessionStorage.removeItem(SESSION_KEY);
+      sessionStorage.removeItem(LAST_SUGGESTION_KEY);
     } catch {
       // ignore
     }
   }, []);
 
-  const sendMessage = useCallback(async (text: string, displayContent?: string, icon?: string) => {
+  const sendMessage = useCallback(async (
+    text: string,
+    displayContent?: string,
+    icon?: string,
+    suggestionId?: string,
+  ) => {
     const trimmed = text.trim();
     if (!trimmed || isLoading) return;
+
+    if (suggestionId) {
+      setLastClickedSuggestionId(suggestionId);
+      persistLastClickedSuggestionId(suggestionId);
+    }
 
     setError(null);
     const userMsg: ChatMessage = { 
@@ -160,7 +205,10 @@ export function ChatAdvisor() {
           'Content-Type': 'application/json',
           'Authorization': `Token ${localStorage.getItem('auth_token') || ''}`,
         },
-        body: JSON.stringify({ messages: history }),
+        body: JSON.stringify({
+          messages: history,
+          suggestion_id: suggestionId || null,
+        }),
       });
 
       if (!res.ok) {
@@ -211,7 +259,7 @@ export function ChatAdvisor() {
   };
 
   const handleSuggestionClick = (suggestion: Suggestion) => {
-    sendMessage(suggestion.prompt, suggestion.short_desc, suggestion.icon);
+    sendMessage(suggestion.prompt, suggestion.short_desc, suggestion.icon, suggestion.id);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
