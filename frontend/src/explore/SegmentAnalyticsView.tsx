@@ -151,9 +151,6 @@ export function SegmentAnalyticsView({
                     onClick={() => onRemoveSkill(s.id)}
                   >
                     ✗ {s.name}
-                    <span className="suggestion-chip__pct suggestion-chip__pct--ok">
-                      {s.pct_of_segment}%
-                    </span>
                   </button>
                 ))}
               </div>
@@ -174,7 +171,6 @@ export function SegmentAnalyticsView({
                     onClick={() => onAddSkill({ id: s.id, name: s.name })}
                   >
                     + {s.name}
-                    <span className="suggestion-chip__n">{s.pct_of_segment}%</span>
                   </button>
                 ))}
               </div>

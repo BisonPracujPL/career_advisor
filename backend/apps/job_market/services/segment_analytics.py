@@ -363,7 +363,7 @@ def _segment_match_score(
     sims = [r["similarity_pct"] for r in results if r.get("similarity_pct") is not None]
     if not sims:
         return {"matching_offers": 0, "avg_similarity_pct": 0}
-    top_n = min(12, len(sims))
+    top_n = min(20, len(sims))
     top = sorted(sims, reverse=True)[:top_n]
     return {
         "matching_offers": len(results),
