@@ -133,6 +133,7 @@ export function SegmentAnalyticsView({
           Symuluj profil na top 20 kompetencjach segmentu. Średnie dopasowanie liczymy z 20
           najlepiej pasujących ofert (TF-IDF cosine) — czasem % może spaść po dodaniu skilli,
           jeśli nowy skill jest rzadszy w segmencie lub zmienia kierunek wektora profilu.
+          Procent przy każdej kompetencji to odsetek ofert w segmencie, które jej wymagają.
         </p>
         <SkillMetricsBar
           matchLabel="śr. dopasowanie w segmencie"
@@ -149,8 +150,12 @@ export function SegmentAnalyticsView({
                     type="button"
                     className="suggestion-chip suggestion-chip--ok"
                     onClick={() => onRemoveSkill(s.id)}
+                    title={`Wymaga tego ${s.pct_of_segment}% ofert w segmencie`}
                   >
                     ✗ {s.name}
+                    <span className="suggestion-chip__pct suggestion-chip__pct--ok">
+                      {s.pct_of_segment}%
+                    </span>
                   </button>
                 ))}
               </div>
@@ -169,8 +174,10 @@ export function SegmentAnalyticsView({
                     className="suggestion-chip suggestion-chip--miss"
                     disabled={selectedIds.has(s.id)}
                     onClick={() => onAddSkill({ id: s.id, name: s.name })}
+                    title={`Wymaga tego ${s.pct_of_segment}% ofert w segmencie`}
                   >
                     + {s.name}
+                    <span className="suggestion-chip__n">{s.pct_of_segment}%</span>
                   </button>
                 ))}
               </div>
