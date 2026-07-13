@@ -803,7 +803,7 @@ export default function App() {
                     )}
                     {browseSkills.length > 0 && (
                       <ul className="browse">
-                        {browseSkills.slice(0, 12).map((s) => (
+                        {browseSkills.map((s) => (
                           <li key={s.id}>
                             <button type="button" onClick={() => addSkill(s)}>
                               + {s.name}
