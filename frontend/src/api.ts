@@ -52,7 +52,7 @@ export const api = {
     request(`/api/v1/market/pillars/${encodeURIComponent(pillarId)}/segments/`),
   filterOptions: (): Promise<any> => request("/api/v1/filters/options/"),
   searchSkills: (q: string): Promise<any> =>
-    request(`/api/v1/skills/search/?q=${encodeURIComponent(q)}&limit=20`),
+    request(`/api/v1/skills/search/?q=${encodeURIComponent(q)}`),
   resolveProfileSkills: (skills: { id?: string; name: string }[]): Promise<{ skills: any[]; updated: boolean }> =>
     request("/api/v1/skills/resolve/", {
       method: "POST",
@@ -74,7 +74,7 @@ export const api = {
       `/api/v1/offers/categories/${encodeURIComponent(name)}/subcategories/`
     ),
   browseSkills: (mainCode: string, subCode: string): Promise<any> => {
-    const p = new URLSearchParams({ limit: "40" });
+    const p = new URLSearchParams();
     if (mainCode) p.set("main_category_code", mainCode);
     if (subCode) p.set("subcategory_code", subCode);
     return request(`/api/v1/skills/browse/?${p}`);

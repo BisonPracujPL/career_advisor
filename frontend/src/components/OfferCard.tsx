@@ -14,22 +14,7 @@ export function OfferCard({ offer, onSelect }: OfferCardProps) {
   const clickable = !!onSelect;
 
   return (
-    <article
-      className={`offer-card ${clickable ? "offer-card--clickable" : ""}`}
-      onClick={clickable ? () => onSelect!(offer.offer_id) : undefined}
-      onKeyDown={
-        clickable
-          ? (e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onSelect!(offer.offer_id);
-              }
-            }
-          : undefined
-      }
-      role={clickable ? "button" : undefined}
-      tabIndex={clickable ? 0 : undefined}
-    >
+    <article className="offer-card">
       <div className="score-block">
         <ScoreRing pct={matchPct} />
         <span className="score-label">Dopasowanie</span>
@@ -56,12 +41,6 @@ export function OfferCard({ offer, onSelect }: OfferCardProps) {
               Pokrycie oferty: <strong>{coveragePct}%</strong> — spełniasz{" "}
               <strong>{ov.matched_count}</strong> z{" "}
               <strong>{ov.offer_skill_count}</strong> wymagań
-              {ov.profile_skill_count > 0 && (
-                <>
-                  {" "}
-                  (profil: {ov.profile_skill_count} kompetencji)
-                </>
-              )}
             </p>
             {ov.matched_skills.length > 0 && (
               <div className="chips-row">
@@ -83,7 +62,13 @@ export function OfferCard({ offer, onSelect }: OfferCardProps) {
           </div>
         )}
         {clickable && (
-          <p className="offer-open-hint">Szczegóły oferty ›</p>
+          <button
+            type="button"
+            className="offer-open-hint"
+            onClick={() => onSelect!(offer.offer_id)}
+          >
+            Szczegóły oferty ›
+          </button>
         )}
       </div>
     </article>

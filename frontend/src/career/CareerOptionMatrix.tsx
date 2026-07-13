@@ -71,7 +71,7 @@ export function CareerOptionMatrix({
       <header className="career-matrix__head">
         <h2>Porównanie opcji</h2>
         <p>
-          Jedna tabela — dopasowanie profilu i widełki Junior / Mid / Senior w segmencie.
+          Dopasowanie profilu i widełki Junior / Mid / Senior w segmencie.
           Szukaj opcji z wysokim skokiem dopasowania i sensownym wzrostem wynagrodzenia.
         </p>
       </header>
@@ -207,7 +207,7 @@ export function CareerOptionMatrix({
 
       <p className="career-matrix__footnote muted">
         Wzrost Jr→Sr to mediana Senior minus mediana Junior w tym segmencie — pokazuje
-        ekonomiczny potencjał ścieżki, nie Twoją indywidualną prognozę awansu.
+        ekonomiczny potencjał ścieżki.
       </p>
     </section>
   );

@@ -64,7 +64,9 @@ export function SkillsProfileEditor({ data, onChange }: { data: Skill[], onChang
       return;
     }
     const t = setTimeout(() => {
-      api.searchSkills(query).then((d) => setHits(d.results || [])).catch(() => setHits([]));
+      api.searchSkills(query)
+        .then((d) => setHits(d.results || []))
+        .catch(() => setHits([]));
     }, 300);
     return () => clearTimeout(t);
   }, [query]);
@@ -256,7 +258,10 @@ export function SkillsProfileEditor({ data, onChange }: { data: Skill[], onChang
         )}
 
         {viewMode === 'search' && hits.length > 0 && (
-          <ul className="suggest" style={{ maxHeight: "300px", marginTop: "0.5rem" }}>
+          <ul
+            className="suggest"
+            style={{ maxHeight: "360px", marginTop: "0.5rem", overflowY: "auto" }}
+          >
             {hits.map((s) => (
               <li key={s.id}>
                 <button type="button" onClick={() => addSkill(s)}>

@@ -406,7 +406,7 @@ export function CareerPathView({
                 ? narrativeBody(narrative.body)
                 : isVirtual
                   ? "Profil wirtualny — testuj ścieżki i pakiety skilli bez zmiany prawdziwego profilu."
-                  : "Dynamiczne drzewko oparte na TF-IDF — każda gałąź realnie podnosi dopasowanie do segmentu rynku."}
+                  : ""}
             </p>
             {displayTree && (
               <CareerTrajectorySummary

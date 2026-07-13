@@ -168,7 +168,7 @@ export function CareerTrajectorySummary({
       {goalLabel && (
         <div className="career-trajectory__goal">
           <span>Cel</span>
-          <strong title={goalLabel}>{shortLabel(goalLabel, 28)}</strong>
+          <strong title={goalLabel}>{goalLabel}</strong>
         </div>
       )}
     </div>

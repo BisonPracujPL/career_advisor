@@ -891,12 +891,6 @@ export default function App() {
               <div className="results-head">
                 <div>
                   <h2>Rekomendowane oferty</h2>
-                  {resultMeta?.count > 0 && searchMatchMode === "profile" && (
-                    <p className="results-sub muted">
-                      Posortowane wg cosine na wektorach TF-IDF (rzadsze skille ważą
-                      więcej). Pierścień = dopasowanie, pasek = pokrycie wymagań oferty.
-                    </p>
-                  )}
                 </div>
                 {resultMeta?.count > 0 && (
                   <span className="badge-count">{resultMeta.count} wyników</span>

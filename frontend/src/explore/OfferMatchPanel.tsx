@@ -60,8 +60,8 @@ export function OfferMatchPanel({
     <section className="explore-card explore-card--match">
       <h3>Dopasowanie</h3>
       <p className="muted explore-hint">
-        Kliknij kompetencje z tej oferty — dodaj z „Brakuje” lub usuń z „Spełniasz”. Procent przy
-        skillu to udział w profilu wymagań oferty (znormalizowany).
+        Kliknij kompetencje z tej oferty — dodaj z „Brakuje” lub usuń z „Spełniasz”. Przy danej
+        umiejętności wyświetlona jest jej ważność dla profilu oferty.
       </p>
       <SkillMetricsBar
         matchLabel="dopasowanie do oferty"

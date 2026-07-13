@@ -16,7 +16,8 @@ class SkillSearchView(APIView):
 
     def get(self, request):
         q = (request.query_params.get("q") or "").strip()
-        limit = min(int(request.query_params.get("limit", 20)), 50)
+        # Domyślnie zwracamy wszystkie pasujące skille (cap 2000 dla bezpieczeństwa).
+        limit = min(int(request.query_params.get("limit", 2000)), 2000)
         if len(q) < 2:
             return Response({"results": []})
         skills = Skill.objects.filter(is_category=False, name__icontains=q).order_by(
@@ -132,7 +133,8 @@ class SkillBrowseView(APIView):
     def get(self, request):
         main_code = request.query_params.get("main_category_code")
         sub_code = request.query_params.get("subcategory_code")
-        limit = min(int(request.query_params.get("limit", 40)), 100)
+        # Zwracamy wszystkie skille z danej (pod)kategorii (cap 2000).
+        limit = min(int(request.query_params.get("limit", 2000)), 2000)
         qs = Skill.objects.filter(is_category=False)
         if main_code:
             qs = qs.filter(main_category_code=main_code)

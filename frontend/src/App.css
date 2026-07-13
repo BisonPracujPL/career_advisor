@@ -1811,7 +1811,6 @@ body {
   margin: 0 0 1.25rem;
   font-size: 0.9rem;
   line-height: 1.55;
-  max-width: 62ch;
 }
 
 .explore-subhead {
@@ -2295,10 +2294,20 @@ body {
 }
 
 .offer-open-hint {
+  display: inline-block;
   margin: 0.5rem 0 0;
+  padding: 0;
   font-size: 0.78rem;
   font-weight: 600;
   color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.offer-open-hint:hover {
+  text-decoration: underline;
 }
 
 .skill-cloud {
@@ -2503,7 +2512,6 @@ body {
 .career-path-hero__sub {
   margin: 0;
   color: var(--muted);
-  max-width: 52rem;
   line-height: 1.5;
 }
 
@@ -3361,6 +3369,12 @@ body {
   min-width: 8rem;
 }
 
+.career-trajectory__goal strong {
+  font-size: 1rem;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
 .career-loading-steps {
   list-style: none;
   margin: 1rem 0 0;
@@ -3427,7 +3441,6 @@ body {
   margin: 0 0 1.25rem;
   color: var(--muted);
   font-size: 0.9rem;
-  max-width: 48rem;
   line-height: 1.5;
 }
 
@@ -3881,7 +3894,6 @@ body {
   color: var(--muted);
   font-size: 0.9rem;
   line-height: 1.5;
-  max-width: 52rem;
 }
 
 .career-matrix__loading {

@@ -97,9 +97,17 @@ class Command(BaseCommand):
             action="store_true",
             help="Pokaż co zostałoby zmienione, nie zapisuj.",
         )
+        parser.add_argument(
+            "--all",
+            action="store_true",
+            dest="all_skills",
+            help="Nadpisz WSZYSTKIE nazwy angielskimi (bez filtra techniczności) — "
+            "pełny powrót słownika do angielskiego.",
+        )
 
     def handle(self, *args, **opts):
         en_path, dry_run = opts["en_csv"], opts["dry_run"]
+        all_skills = opts["all_skills"]
 
         try:
             with open(en_path, newline="", encoding="utf-8") as f:
@@ -123,7 +131,7 @@ class Command(BaseCommand):
                 continue
             if english == skill.name:
                 continue
-            if should_use_english(english, skill.main_category_code):
+            if all_skills or should_use_english(english, skill.main_category_code):
                 if len(samples) < 20:
                     samples.append((skill.name, english))
                 skill.name = english

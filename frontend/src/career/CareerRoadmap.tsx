@@ -635,8 +635,7 @@ export function CareerTreePanel({
       <p className="roadmap-sidebar__eyebrow">Szczegóły kroku</p>
       <h2 className="roadmap-sidebar__title">Kliknij klocek na mapie</h2>
       <p className="roadmap-sidebar__sub">
-        Zobacz wzrost dopasowania i mediany wynagrodzeń Junior / Mid / Senior — bez
-        przechodzenia na inne strony.
+        Zobacz wzrost dopasowania i mediany wynagrodzeń Junior / Mid / Senior.
       </p>
 
       {!selectedNode && (

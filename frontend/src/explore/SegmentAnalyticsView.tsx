@@ -118,22 +118,15 @@ export function SegmentAnalyticsView({
       <section className="explore-card">
         <h3>Stanowiska w segmencie</h3>
         <p className="muted explore-hint">
-          Statystyki dla ofert spełniających wybrane filtry regionu i poziomu. Oferty na dole
-          listy również respektują te filtry.
+          Statystyki dla ofert spełniających wybrane filtry regionu i poziomu.
         </p>
-        <SegmentLevelCharts
-          rows={levelRows}
-          hourlyToMonthlyHours={data.salary_normalization?.hourly_to_monthly_hours}
-        />
+        <SegmentLevelCharts rows={levelRows} />
       </section>
 
       <section className="explore-card explore-card--match">
         <h3>Dopasowanie</h3>
         <p className="muted explore-hint">
-          Symuluj profil na top 20 kompetencjach segmentu. Średnie dopasowanie liczymy z 20
-          najlepiej pasujących ofert (TF-IDF cosine) — czasem % może spaść po dodaniu skilli,
-          jeśli nowy skill jest rzadszy w segmencie lub zmienia kierunek wektora profilu.
-          Procent przy każdej kompetencji to odsetek ofert w segmencie, które jej wymagają.
+          Symuluj profil na top 20 kompetencjach segmentu.
         </p>
         <SkillMetricsBar
           matchLabel="śr. dopasowanie w segmencie"

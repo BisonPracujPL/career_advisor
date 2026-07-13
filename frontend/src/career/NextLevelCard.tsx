@@ -54,11 +54,6 @@ export function NextLevelReadinessCard({
           )}
           . Progi: {CAREER_LEVEL_THRESHOLDS_TEXT}.
         </p>
-        <p className="muted explore-hint career-next-level__compare-hint">
-          Porównujemy średnie dopasowanie TF-IDF (top ofert w segmencie). Po dodaniu skilla
-          wektor profilu się zmienia — cosine może spaść, jeśli nowa kompetencja jest rzadsza
-          w danym poziomie albo przesuwa profil od typowych wymagań ofert.
-        </p>
       </header>
 
       <div className="career-next-level__grid">
