@@ -1,4 +1,4 @@
-import { MultiSelect } from "../components/ui";
+import { MultiSelect, SingleSelect } from "../components/ui";
 import { SegmentAnalytics, Skill } from "../types";
 import { SkillMetricsBar } from "./SkillMetricsBar";
 import { SkillWordCloud } from "./SkillWordCloud";
@@ -75,20 +75,16 @@ export function SegmentAnalyticsView({
         <div className="filter-row filter-row--segment">
           <label className="field">
             <span className="field-label">Województwo</span>
-            <select
-              className="input"
+            <SingleSelect
               value={filtersDraft.region_name}
-              onChange={(e) =>
-                onFiltersDraftChange({ ...filtersDraft, region_name: e.target.value })
+              onChange={(v) =>
+                onFiltersDraftChange({ ...filtersDraft, region_name: v })
               }
-            >
-              <option value="">Cała Polska</option>
-              {regions.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: "", label: "Cała Polska" },
+                ...regions.map((r) => ({ value: r, label: r })),
+              ]}
+            />
           </label>
           <div>
             <MultiSelect

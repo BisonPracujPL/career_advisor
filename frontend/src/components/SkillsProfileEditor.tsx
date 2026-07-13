@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { Skill } from "../types";
+import { SingleSelect } from "./ui";
 
 export function SkillsProfileEditor({ data, onChange }: { data: Skill[], onChange: (d: Skill[]) => void }) {
   const [query, setQuery] = useState("");
@@ -154,18 +155,28 @@ export function SkillsProfileEditor({ data, onChange }: { data: Skill[], onChang
             <div style={{ display: "flex", gap: "1rem" }}>
               <label className="field" style={{ flex: 1, marginBottom: 0 }}>
                 <span className="field-label" style={{ fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.02em" }}>Kategoria główna</span>
-                <select className="input" style={{ cursor: "pointer" }} value={mainCode} onChange={e => setMainCode(e.target.value)}>
-                  <option value="">Wybierz kategorię...</option>
-                  {categories.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
-                </select>
+                <SingleSelect
+                  value={mainCode}
+                  onChange={setMainCode}
+                  placeholder="Wybierz kategorię..."
+                  options={[
+                    { value: "", label: "Wybierz kategorię..." },
+                    ...categories.map(c => ({ value: c.code, label: c.name })),
+                  ]}
+                />
               </label>
               {mainCode && (
                 <label className="field" style={{ flex: 1, marginBottom: 0 }}>
                   <span className="field-label" style={{ fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.02em" }}>Podkategoria</span>
-                  <select className="input" style={{ cursor: "pointer" }} value={subCode} onChange={e => setSubCode(e.target.value)}>
-                    <option value="">Wybierz podkategorię...</option>
-                    {subcategories.map(s => <option key={s.code} value={s.code}>{s.name}</option>)}
-                  </select>
+                  <SingleSelect
+                    value={subCode}
+                    onChange={setSubCode}
+                    placeholder="Wybierz podkategorię..."
+                    options={[
+                      { value: "", label: "Wybierz podkategorię..." },
+                      ...subcategories.map(s => ({ value: s.code, label: s.name })),
+                    ]}
+                  />
                 </label>
               )}
             </div>

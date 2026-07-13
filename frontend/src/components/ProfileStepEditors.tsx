@@ -6,6 +6,19 @@ import {
   IndustryItem,
   LanguageItem as LangType,
 } from "../types";
+import { SingleSelect } from "./ui";
+
+const NUM_OPTIONS = (n: number) =>
+  Array.from({ length: n }, (_, i) => ({ value: String(i), label: String(i) }));
+const DEGREE_OPTIONS = [
+  { value: "", label: "Wybierz stopień..." },
+  { value: "Średnie", label: "Średnie" },
+  { value: "Licencjat", label: "Licencjat" },
+  { value: "Inżynier", label: "Inżynier" },
+  { value: "Magister", label: "Magister" },
+  { value: "Doktor", label: "Doktor" },
+  { value: "Inne", label: "Inne" },
+];
 
 export function ProfileIndustriesEditor({ data, onChange }: { data: IndustryItem[], onChange: (d: IndustryItem[]) => void }) {
   const [categories, setCategories] = useState<any[]>([]);
@@ -81,12 +94,15 @@ export function ProfileIndustriesEditor({ data, onChange }: { data: IndustryItem
       <div style={{ marginBottom: "1.25rem" }}>
         <label className="field" style={{ marginBottom: 0 }}>
           <span className="field-label">Wybierz branżę</span>
-          <select className="input" style={{ cursor: 'pointer' }} value={mainCat} onChange={e => setMainCat(e.target.value)}>
-            <option value="">Wybierz z listy...</option>
-            {categories.map((c) => (
-              <option key={c.code} value={c.code}>{c.name}</option>
-            ))}
-          </select>
+          <SingleSelect
+            value={mainCat}
+            onChange={setMainCat}
+            placeholder="Wybierz z listy..."
+            options={[
+              { value: "", label: "Wybierz z listy..." },
+              ...categories.map((c) => ({ value: c.code, label: c.name })),
+            ]}
+          />
         </label>
       </div>
 
@@ -257,15 +273,19 @@ export function ProfileExperienceEditor({ data, onChange }: { data: ExpType[], o
           <div style={{ display: 'flex', gap: '1rem' }}>
             <label className="field" style={{ flex: 1 }}>
               <span className="field-label">Lata</span>
-              <select className="input" value={form.years} onChange={e => setForm({ ...form, years: parseInt(e.target.value) })}>
-                {Array.from({ length: 31 }, (_, i) => <option key={`y-${i}`} value={i}>{i}</option>)}
-              </select>
+              <SingleSelect
+                value={String(form.years)}
+                onChange={(v) => setForm({ ...form, years: parseInt(v) })}
+                options={NUM_OPTIONS(31)}
+              />
             </label>
             <label className="field" style={{ flex: 1 }}>
               <span className="field-label">Miesiące</span>
-              <select className="input" value={form.months} onChange={e => setForm({ ...form, months: parseInt(e.target.value) })}>
-                {Array.from({ length: 12 }, (_, i) => <option key={`m-${i}`} value={i}>{i}</option>)}
-              </select>
+              <SingleSelect
+                value={String(form.months)}
+                onChange={(v) => setForm({ ...form, months: parseInt(v) })}
+                options={NUM_OPTIONS(12)}
+              />
             </label>
           </div>
           <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
@@ -325,15 +345,12 @@ export function ProfileEducationEditor({ data, onChange }: { data: EduType[], on
           </label>
           <label className="field">
             <span className="field-label">Stopień</span>
-            <select className="input" value={form.degree_level} onChange={e => setForm({ ...form, degree_level: e.target.value })}>
-              <option value="">Wybierz stopień...</option>
-              <option value="Średnie">Średnie</option>
-              <option value="Licencjat">Licencjat</option>
-              <option value="Inżynier">Inżynier</option>
-              <option value="Magister">Magister</option>
-              <option value="Doktor">Doktor</option>
-              <option value="Inne">Inne</option>
-            </select>
+            <SingleSelect
+              value={form.degree_level}
+              onChange={(v) => setForm({ ...form, degree_level: v })}
+              placeholder="Wybierz stopień..."
+              options={DEGREE_OPTIONS}
+            />
           </label>
           <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
             <button type="button" className="btn-primary" onClick={add}>Zapisz</button>
@@ -392,11 +409,15 @@ export function ProfileLanguagesEditor({ data, onChange }: { data: LangType[], o
         <div style={{ padding: "1.5rem", border: "1px solid var(--border)", borderRadius: "12px", background: "#fafbfd", marginBottom: "1rem" }}>
           <label className="field">
             <span className="field-label">Język</span>
-            <select className="input" value={langName} onChange={e => setLangName(e.target.value)}>
-              {COMMON_LANGUAGES.map(l => (
-                <option key={l} value={l}>{l === "" ? "Wybierz język..." : l}</option>
-              ))}
-            </select>
+            <SingleSelect
+              value={langName}
+              onChange={setLangName}
+              placeholder="Wybierz język..."
+              options={COMMON_LANGUAGES.map(l => ({
+                value: l,
+                label: l === "" ? "Wybierz język..." : l,
+              }))}
+            />
           </label>
           {langName === "Inny" && (
             <label className="field" style={{ marginTop: "1rem" }}>
@@ -406,9 +427,11 @@ export function ProfileLanguagesEditor({ data, onChange }: { data: LangType[], o
           )}
           <label className="field" style={{ marginTop: "1rem" }}>
             <span className="field-label">Poziom</span>
-            <select className="input" value={level} onChange={(e) => setLevel(e.target.value)}>
-              {LEVELS.map((lvl) => <option key={lvl} value={lvl}>{lvl}</option>)}
-            </select>
+            <SingleSelect
+              value={level}
+              onChange={setLevel}
+              options={LEVELS.map((lvl) => ({ value: lvl, label: lvl }))}
+            />
           </label>
           <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
             <button type="button" className="btn-primary" onClick={add}>Zapisz</button>
@@ -470,15 +493,19 @@ function ExperienceItem({ job, onChangeItem, onRemove }: { job: ExpType, onChang
           <div style={{ display: 'flex', gap: '1rem' }}>
             <label className="field" style={{ flex: 1, marginBottom: 0 }}>
               <span className="field-label">Lata</span>
-              <select className="input" value={Math.floor(job.duration_months / 12)} onChange={e => onChangeItem({ ...job, duration_months: (parseInt(e.target.value) * 12) + (job.duration_months % 12) })}>
-                {Array.from({ length: 31 }, (_, i) => <option key={`y-${i}`} value={i}>{i}</option>)}
-              </select>
+              <SingleSelect
+                value={String(Math.floor(job.duration_months / 12))}
+                onChange={(v) => onChangeItem({ ...job, duration_months: (parseInt(v) * 12) + (job.duration_months % 12) })}
+                options={NUM_OPTIONS(31)}
+              />
             </label>
             <label className="field" style={{ flex: 1, marginBottom: 0 }}>
               <span className="field-label">Miesiące</span>
-              <select className="input" value={job.duration_months % 12} onChange={e => onChangeItem({ ...job, duration_months: (Math.floor(job.duration_months / 12) * 12) + parseInt(e.target.value) })}>
-                {Array.from({ length: 12 }, (_, i) => <option key={`m-${i}`} value={i}>{i}</option>)}
-              </select>
+              <SingleSelect
+                value={String(job.duration_months % 12)}
+                onChange={(v) => onChangeItem({ ...job, duration_months: (Math.floor(job.duration_months / 12) * 12) + parseInt(v) })}
+                options={NUM_OPTIONS(12)}
+              />
             </label>
           </div>
         </div>
@@ -531,15 +558,12 @@ function EducationItem({ edu, onChangeItem, onRemove }: { edu: EduType, onChange
           </label>
           <label className="field" style={{ marginBottom: 0 }}>
             <span className="field-label">Stopień</span>
-            <select className="input" value={edu.degree_level} onChange={e => onChangeItem({ ...edu, degree_level: e.target.value })}>
-              <option value="">Wybierz stopień...</option>
-              <option value="Średnie">Średnie</option>
-              <option value="Licencjat">Licencjat</option>
-              <option value="Inżynier">Inżynier</option>
-              <option value="Magister">Magister</option>
-              <option value="Doktor">Doktor</option>
-              <option value="Inne">Inne</option>
-            </select>
+            <SingleSelect
+              value={edu.degree_level}
+              onChange={(v) => onChangeItem({ ...edu, degree_level: v })}
+              placeholder="Wybierz stopień..."
+              options={DEGREE_OPTIONS}
+            />
           </label>
         </div>
       )}
@@ -589,9 +613,11 @@ function LanguageItem({ lang, onChangeItem, onRemove }: { lang: LangType, onChan
           </label>
           <label className="field" style={{ marginBottom: 0 }}>
             <span className="field-label">Poziom</span>
-            <select className="input" value={lang.proficiency_level} onChange={e => onChangeItem({ ...lang, proficiency_level: e.target.value })}>
-              {LEVELS.map((lvl) => <option key={lvl} value={lvl}>{lvl}</option>)}
-            </select>
+            <SingleSelect
+              value={lang.proficiency_level}
+              onChange={(v) => onChangeItem({ ...lang, proficiency_level: v })}
+              options={LEVELS.map((lvl) => ({ value: lvl, label: lvl }))}
+            />
           </label>
         </div>
       )}

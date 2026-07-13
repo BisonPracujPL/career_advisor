@@ -3,7 +3,7 @@ import { api } from "./api";
 import Auth from "./Auth";
 import UserProfileWizard from "./UserProfileWizard";
 import { Navbar } from "./components/Navbar";
-import { MultiSelect, Collapse, Chip } from "./components/ui";
+import { MultiSelect, SingleSelect, Collapse, Chip } from "./components/ui";
 import { OfferCard } from "./components/OfferCard";
 import { ChatAdvisor } from "./components/ChatAdvisor";
 import { CareerPathView } from "./career/CareerPathView";
@@ -621,20 +621,17 @@ export default function App() {
             <div className="filter-row">
               <label className="field">
                 <span className="field-label">Województwo</span>
-                <select
-                  className="input"
+                <SingleSelect
                   value={filters.region_name}
-                  onChange={(e) =>
-                    setFilters((f) => ({ ...f, region_name: e.target.value }))
-                  }
-                >
-                  <option value="">Cała Polska</option>
-                  {(filterOpts?.regions || []).map((r: string) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => setFilters((f) => ({ ...f, region_name: v }))}
+                  options={[
+                    { value: "", label: "Cała Polska" },
+                    ...(filterOpts?.regions || []).map((r: string) => ({
+                      value: r,
+                      label: r,
+                    })),
+                  ]}
+                />
               </label>
               <div className="field">
                 <MultiSelect
@@ -736,24 +733,23 @@ export default function App() {
               <Collapse title="Branża i podkategoria" defaultOpen={false}>
                 <label className="field">
                   <span className="field-label">Branża</span>
-                  <select
-                    className="input"
+                  <SingleSelect
                     value={filters.lead_main_category}
-                    onChange={(e) =>
+                    onChange={(v) =>
                       setFilters((f) => ({
                         ...f,
-                        lead_main_category: e.target.value,
+                        lead_main_category: v,
                         lead_sub_category: "",
                       }))
                     }
-                  >
-                    <option value="">— wszystkie branże —</option>
-                    {(filterOpts?.lead_main_categories || []).map((c: string) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
+                    options={[
+                      { value: "", label: "— wszystkie branże —" },
+                      ...(filterOpts?.lead_main_categories || []).map((c: string) => ({
+                        value: c,
+                        label: c,
+                      })),
+                    ]}
+                  />
                 </label>
               </Collapse>
 
@@ -785,31 +781,25 @@ export default function App() {
                   )}
 
                   <Collapse title="Przeglądaj katalog kompetencji" defaultOpen={false}>
-                    <select
-                      className="input"
+                    <SingleSelect
                       value={mainCat}
-                      onChange={(e) => setMainCat(e.target.value)}
-                    >
-                      <option value="">Obszar zawodowy…</option>
-                      {categories.map((c) => (
-                        <option key={c.code} value={c.code}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(v) => setMainCat(v)}
+                      placeholder="Obszar zawodowy…"
+                      options={[
+                        { value: "", label: "Obszar zawodowy…" },
+                        ...categories.map((c) => ({ value: c.code, label: c.name })),
+                      ]}
+                    />
                     {subCats.length > 0 && (
-                      <select
-                        className="input"
+                      <SingleSelect
                         value={subCat}
-                        onChange={(e) => setSubCat(e.target.value)}
-                      >
-                        <option value="">Specjalizacja…</option>
-                        {subCats.map((c) => (
-                          <option key={c.code} value={c.code}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(v) => setSubCat(v)}
+                        placeholder="Specjalizacja…"
+                        options={[
+                          { value: "", label: "Specjalizacja…" },
+                          ...subCats.map((c) => ({ value: c.code, label: c.name })),
+                        ]}
+                      />
                     )}
                     {browseSkills.length > 0 && (
                       <ul className="browse">
