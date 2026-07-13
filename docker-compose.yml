@@ -62,6 +62,7 @@ services:
       - ./backend:/app                          # live-reload during development
       - ./data_en_processed.csv:/data/data_en_processed.csv:ro
       - ./lightcast_data_formatted.csv:/data/lightcast_data_formatted.csv:ro
+      - ./lightcast_data_formatted.en.csv:/data/lightcast_data_formatted.en.csv:ro  # angielskie nazwy do fix_skill_names
       - ./lightcast_hier_mapper.json:/data/lightcast_hier_mapper.json:ro
       - ./final_rag_pdfs:/app/rag_pdfs:ro       # PDF market reports for RAG indexing
     ports:
