@@ -76,7 +76,8 @@ Gdy aplikacja działa, poszczególne panele znajdziesz pod adresami:
 | **Frontend** | [http://127.0.0.1:5173](http://127.0.0.1:5173) |
 | **API Backend** | [http://127.0.0.1:8000](http://127.0.0.1:8000) |
 | **pgAdmin** (Zarządzanie Bazą) | [http://127.0.0.1:5050](http://127.0.0.1:5050) |
-Wskazówka: Na maszynie zdalnej (np. gdy używasz wirtualnej maszyny w Cursor) pamiętaj o przekierowaniu portów 5173 i 8000 na swój lokalny komputer.
+
+> **Wskazówka:** Na maszynie zdalnej (np. gdy używasz wirtualnej maszyny w Cursor) pamiętaj o przekierowaniu portów 5173 i 8000 na swój lokalny komputer.
 
 ## Przydatne komendy
 
