@@ -1,95 +1,86 @@
-# Career Advisor
+# Career Advisor 
 
-Dopasowanie ofert pracy do profilu kompetencji (Django + pgvector + React).
+Aplikacja wspomagająca dopasowanie ofert pracy do profilu kompetencji kandydata. Wykorzystuje wektoryzację i analizę języka (pgvector) oraz intuicyjny interfejs.
 
-## Uruchomienie (tylko Docker)
+**Technologie:** Django, pgvector (PostgreSQL), React (Vite), Docker.
 
-```bash
-cp .env.example .env   # uzupełnij hasła
-docker compose up --build
-```
+---
 
-| Usługa    | URL                      |
-|-----------|--------------------------|
-| Frontend  | http://127.0.0.1:5173    |
-| API       | http://127.0.0.1:8000    |
-| pgAdmin   | http://127.0.0.1:5050    |
+## Struktura projektu
 
-Na maszynie zdalnej (np. VM w Cursor) przekieruj porty **5173** i **8000** na laptop.
+* `backend/` — Django REST API, logika dopasowywania (wektoryzacja)
+* `frontend/` — Aplikacja w React (Vite), proxy dla API `/api` -> backend
+* `scripts/` — Skrypty pomocnicze
+* `docker-compose.yml` — Konfiguracja wszystkich kontenerów
 
-### Pierwsze dane (w kontenerze backend)
+---
 
-```bash
-docker compose exec backend python manage.py load_skills /data/lightcast_data_formatted.csv
-docker compose exec backend python manage.py load_offers /data/data_en_processed.csv
-```
+## Jak uruchomić aplikację? (Instrukcja Krok po Kroku)
 
-Pliki CSV są zamontowane w `docker-compose.yml` (ścieżki w `/data/...`).
+### Krok 1: Klonowanie i konfiguracja bazy
+1. Sklonuj to repozytorium na swój komputer:
+   ```bash
+   git clone https://github.com/BisonPracujPL/career_advisor.git
+   cd career_advisor```
 
-### Przydatne komendy
+2. Skopiuj plik z przykładowymi zmiennymi środowiskowymi. Uzupełnij w nim hasło do bazy danych:
+    ```bash
+    cp .env.example .env```
 
-```bash
-docker compose logs -f frontend
-docker compose exec backend python manage.py test_skill_similarity --count 5
-```
+### Krok 2: Budowa i uruchomienie środowiska
 
-## Struktura
-
-- `backend/` — Django REST API, matching wektorowy  
-- `frontend/` — React (Vite), proxy `/api` → backend  
-- `docker-compose.yml` — postgres, pgadmin, backend, frontend  
-
-## Aktualizacja bazy do pełnej, polskiej wersji (Wszystkie oferty + Polskie skille)
-
-Aby aplikacja posiadała wszystkie oferty z polskiego rynku pracy oraz poprawnie przetłumaczony słownik umiejętności (LightCast), należy zresetować bazę danych i załadować nowe pliki.
-
-### 1. Skąd pobrać pliki z danymi?
-Pliki z danymi są zbyt duże, aby przechowywać je w repozytorium kodu. Można je wziąć z:
-
-1. **Polski słownik LightCast** – wejdź na https://github.com/BisonPracujPL/OJD-DAPS-skills-polish- i pobierz stamtąd dwa pliki (znajdują się w folderze `ojd_daps_skills/data`): `lightcast_pl_data_formatted.csv` oraz `lightcast_pl_hier_mapper.json` i zapisz pod nazwami `lightcast_data_formatted.csv` oraz  `lightcast_hier_mapper.json`.
-2. **Przetworzona baza ofert** – pobierz gotowy plik z ofertami i wygenerowanymi polskimi skillami (plik `data_en_processed.csv` polskiej wersji) z dysku: https://drive.google.com/file/d/1Hr4ZmL3h2_w9a1Zaf9v5jrcYGya4EQxA/view?usp=sharing.
-
-*Wszystkie trzy pliki do głównego folderu projektu.*
-
-### 2. Reset i przebudowa środowiska
-Zatrzymaj kontenery i bezwarunkowo usuń stary wolumen bazy danych, aby pozbyć się starych ofert:
+1. Uruchom kontenery w tle. Za pierwszym razem Docker zbuduje wszystkie potrzebne obrazy:
 
 ```bash
-docker compose down -v
-```
+docker compose up -d --build```
+
+2. Gdy kontenery wstaną, zbuduj tabele w bazie danych (migracje):
 ```bash
-docker compose up -d --build
-```
+docker compose exec backend python manage.py migrate```
 
-Następnie zbuduj tabele w bazie:
+### Krok 3: Wgrywanie danych początkowych
+Teraz wczytaj zebrane wcześniej pliki z danymi do bazy. Uruchom te komendy jedna po drugiej:
+
+1. Załadowanie słownika umiejętności (LightCast):
 ```bash
-docker compose exec backend python manage.py migrate
-```
+docker compose exec backend python manage.py load_skills /data/lightcast_data_formatted.csv /data/lightcast_hier_mapper.json```
 
-### 3. Wgrywanie danych
-
-Uruchom poniższe komendy jedna po drugiej:
-
-A. Słownik umiejętności (LightCast):
-
+2.Załadowanie bazy ofert pracy:
 ```bash
-docker compose exec backend python manage.py load_skills /data/lightcast_data_formatted.csv /data/lightcast_hier_mapper.json
-```
+docker compose exec -e DEBUG=False backend python manage.py load_offers /data/data_en_processed.csv --threshold 0.5``
 
-B. Baza ofert pracy:
+3. Obliczenia dla modelu i wektoryzacja skilli:
+```bash
+docker compose exec -e DEBUG=False backend python manage.py compute_skill_idf```
 
 ```bash
-docker compose exec -e DEBUG=False backend python manage.py load_offers /data/data_en_processed.csv --threshold 0.5
-```
-
-C. Wektory i TD-IDF:
+docker compose exec -e DEBUG=False backend python manage.py build_skill_vectors --vector-value tfidf```
 
 ```bash
-docker compose exec -e DEBUG=False backend python manage.py compute_skill_idf
-```
+docker compose exec -e DEBUG=False backend python manage.py embed_offers```
+
+## Dostępne usługi
+
+Gdy aplikacja działa, poszczególne panele znajdziesz pod adresami:
+Usługa	URL (Adres w przeglądarce)
+Frontend	http://127.0.0.1:5173
+API Backend	http://127.0.0.1:8000
+pgAdmin (Zarządzanie Bazą)	http://127.0.0.1:5050
+
+Wskazówka: Na maszynie zdalnej (np. gdy używasz wirtualnej maszyny w Cursor) pamiętaj o przekierowaniu portów 5173 i 8000 na swój lokalny komputer.
+
+## Przydatne komendy
+
+1. Podgląd logów Frontendu (na żywo)
 ```bash
-docker compose exec -e DEBUG=False backend python manage.py build_skill_vectors --vector-value tfidf
-```
+docker compose logs -f frontend```
+
+2. Testowanie wektorowego dopasowywania skilli
 ```bash
-docker compose exec -e DEBUG=False backend python manage.py embed_offers
-```
+docker compose exec backend python manage.py test_skill_similarity --count 5```
+
+3. Restart i twarde czyszczenie bazy (usunięcie starych danych)
+```bash
+docker compose down -v```
+
+(Po tej operacji trzeba powtórzyć budowę i ładowanie z Kroków 3 i 4).
