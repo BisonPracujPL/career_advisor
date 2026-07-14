@@ -21,3 +21,7 @@ frontend/dist/
 # Final rag
 final_rag.zip
 final_rag_pdfs/
+
+*.csv
+lightcast_hier_mapper.json
+mcp_*.txt
