@@ -3824,6 +3824,12 @@ body {
   overflow: hidden;
 }
 
+/* Po otwarciu nie przycinamy zawartości, żeby rozwijane listy (SingleSelect)
+   w ostatnich sekcjach — np. wybór branży — nie były ucinane dołem panelu. */
+.virtual-profile-panel--open {
+  overflow: visible;
+}
+
 .virtual-profile-panel__toggle {
   width: 100%;
   display: flex;
@@ -3843,6 +3849,7 @@ body {
 .virtual-profile-panel--open .virtual-profile-panel__toggle {
   border-bottom: 1px solid var(--border);
   background: rgba(28, 176, 246, 0.04);
+  border-radius: var(--radius) var(--radius) 0 0;
 }
 
 .virtual-profile-panel__toggle:hover {
